@@ -1,6 +1,6 @@
 {
   "name": "idle-hive",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Gerenciador de multi-contas com sessoes isoladas em uma unica janela (estilo Idle Labs)",
   "main": "src/main.js",
   "author": "",
@@ -28,6 +28,14 @@
       "icon": "build/icon.ico",
       "artifactName": "IdleHive-Setup.${ext}"
     },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IdleHive"
+    },
     "files": [
       "src/**/*"
     ],
@@ -38,7 +46,8 @@
       {
         "provider": "github",
         "owner": "pedrosomichel-idle",
-        "repo": "idle-hive"
+        "repo": "idle-hive",
+        "releaseType": "release"
       }
     ]
   }
