@@ -1,6 +1,6 @@
 {
   "name": "idle-hive",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Gerenciador de multi-contas com sessoes isoladas em uma unica janela (estilo Idle Labs)",
   "main": "src/main.js",
   "author": "",
@@ -25,7 +25,8 @@
     "productName": "IdleHive",
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "artifactName": "IdleHive-Setup.${ext}"
     },
     "files": [
       "src/**/*"
