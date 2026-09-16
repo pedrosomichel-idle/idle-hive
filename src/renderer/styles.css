@@ -1,0 +1,976 @@
+/* ---------------------------------------------------------------------
+   Design tokens
+   Paleta: base quase-preta + indigo (marca) + âmbar (favoritos/alerta
+   leve) — o "painel de controle da colmeia". Hexágono é o motivo visual
+   recorrente (logo, watermark, acentos de estado), não decoração solta.
+--------------------------------------------------------------------- */
+
+:root {
+  --bg: #0e1013;
+  --surface: #171a20;
+  --surface-2: #1d222b;
+  --surface-3: #232833;
+  --border: #262b34;
+  --border-soft: #313746;
+
+  --text: #eef0f4;
+  --text-dim: #8b93a1;
+  --text-faint: #565d68;
+
+  --indigo: #5865f2;
+  --indigo-bright: #7c88ff;
+  --indigo-dim: #4752c4;
+  --amber: #f0b132;
+  --green: #3ba55d;
+  --red: #ef4444;
+
+  --font-ui: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+.view.hidden {
+  display: none;
+}
+
+/* ---------- Telas de autenticação / licença ---------- */
+
+.auth-view {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(88, 101, 242, 0.14), transparent 50%),
+    /* watermark de hexágonos, bem sutil — reforça a marca sem competir com o conteúdo */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='96' viewBox='0 0 84 96'%3E%3Cpolygon points='42,2 80,24 80,72 42,94 4,72 4,24' fill='none' stroke='%23ffffff' stroke-opacity='0.025' stroke-width='1.5'/%3E%3C/svg%3E"),
+    var(--bg);
+  background-position: center, 0 0;
+}
+
+.auth-shell {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 26px;
+}
+
+.hero-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 6px 18px rgba(88, 101, 242, 0.4));
+}
+
+.hero-title {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px 0;
+}
+
+.hero-tagline {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0;
+  text-align: center;
+}
+
+.auth-tabs {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin-bottom: 20px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 8px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.auth-tab.active {
+  background: var(--indigo);
+  color: #fff;
+}
+
+.auth-panel.hidden {
+  display: none;
+}
+
+.panel-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 14px 0;
+  text-align: center;
+}
+
+.auth-footnote {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  margin: 18px 0 0 0;
+  line-height: 1.6;
+  max-width: 300px;
+}
+
+.auth-card {
+  width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  text-align: center;
+}
+
+.auth-card h1 {
+  font-size: 18px;
+  margin: 0 0 6px 0;
+}
+
+.auth-card .license-heading {
+  font-size: 18px;
+  margin: 0 0 6px 0;
+  font-weight: 700;
+}
+
+.auth-card .subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 20px 0;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-card input {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.auth-card input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.auth-card button[type="submit"],
+.auth-card button#buy-license-btn,
+.auth-card button#buy-device-slot-btn,
+.auth-card button#relogin-btn {
+  margin-top: 4px;
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+
+.auth-card button[type="submit"]:hover,
+.auth-card button#buy-license-btn:hover,
+.auth-card button#buy-device-slot-btn:hover,
+.auth-card button#relogin-btn:hover {
+  background: var(--indigo-dim);
+}
+
+.auth-card button.hidden {
+  display: none;
+}
+
+.auth-card .link-btn {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  display: block;
+  width: 100%;
+}
+
+.auth-card .link-btn:hover {
+  color: #fff;
+}
+
+.auth-error {
+  color: var(--red);
+  font-size: 12px;
+  margin: 12px 0 0 0;
+  min-height: 14px;
+}
+
+.redeem-key-box {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+.redeem-key-box.hidden {
+  display: none;
+}
+
+.redeem-key-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+
+.redeem-key-box form {
+  display: flex;
+  gap: 6px;
+}
+
+.redeem-key-box input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.redeem-key-box input::placeholder {
+  font-family: var(--font-mono);
+}
+
+.redeem-key-box input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.redeem-key-box button[type="submit"] {
+  background: transparent;
+  border: 1px solid var(--indigo);
+  color: var(--indigo-bright);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.redeem-key-box button[type="submit"]:hover {
+  background: var(--indigo);
+  color: #fff;
+}
+
+/* ---------- Sidebar ---------- */
+
+#view-app {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+.sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 100%;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  overflow-y: auto;
+  z-index: 1;
+}
+
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.workspace-name {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Marcador hexagonal antes do nome do workspace — o mesmo motivo do
+   logo, em miniatura, ao invés de um ponto genérico. */
+.workspace-name::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  background: var(--indigo);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.top-icons {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: #c9cdd6;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-btn:hover:not(:disabled) {
+  border-color: var(--indigo);
+  color: #fff;
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.add-form.hidden {
+  display: none;
+}
+
+.add-form input {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.add-form input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.add-form button {
+  margin-top: 4px;
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.add-form button:hover {
+  background: var(--indigo-dim);
+}
+
+.account-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-item {
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.account-item:hover {
+  border-color: var(--border-soft);
+}
+
+.account-item.focused {
+  border-color: var(--border-soft);
+  border-left-color: var(--indigo);
+  background: var(--surface-3);
+}
+
+.account-item .row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.account-item .name-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.favorite-star {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.favorite-star:hover {
+  color: var(--amber);
+}
+
+.favorite-star.active {
+  color: var(--amber);
+}
+
+.account-item .name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rename-input {
+  background: var(--bg);
+  border: 1px solid var(--indigo);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 2px 6px;
+  width: 140px;
+  outline: none;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.online {
+  background: var(--green);
+  box-shadow: 0 0 0 2px rgba(59, 165, 93, 0.18);
+}
+
+.status-dot.erro {
+  background: var(--red);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18);
+}
+
+.status-dot.loading {
+  background: var(--amber);
+  box-shadow: 0 0 0 2px rgba(240, 177, 50, 0.18);
+}
+
+.status-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.account-item .row-bottom {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.empty-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 28px;
+  padding: 0 8px;
+}
+
+.empty-hint svg {
+  opacity: 0.5;
+}
+
+.update-banner {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--indigo);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.update-banner.hidden {
+  display: none;
+}
+
+.update-banner button {
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.update-banner button:hover {
+  background: var(--indigo-dim);
+}
+
+/* ---------- Camada de headers dos painéis ---------- */
+
+#headers-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.panel-header {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top-width: 2px;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 0 8px;
+  font-size: 12px;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+/* A cor da borda superior funciona como indicador de estado do painel —
+   a mesma informação do pontinho, só que visível até de longe. */
+.panel-header.status-online {
+  border-top-color: var(--green);
+}
+
+.panel-header.status-erro {
+  border-top-color: var(--red);
+}
+
+.panel-header.status-loading {
+  border-top-color: var(--amber);
+}
+
+.panel-header .drag-handle {
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.panel-header .title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.panel-header .title-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.panel-header .title-text .name {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.panel-header .title-text .url {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+}
+
+.panel-header .actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.panel-header button {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.panel-header button:hover {
+  background: var(--surface-3);
+  color: #fff;
+}
+
+.panel-header button.danger:hover {
+  color: var(--red);
+}
+
+/* ---------- Modal de Conta e Licença ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 9, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: 340px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  text-align: center;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.modal-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.modal-card button#account-buy-license-btn {
+  width: 100%;
+  margin-bottom: 10px;
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.modal-card button#account-buy-license-btn:hover {
+  background: var(--indigo-dim);
+}
+
+.modal-card button.hidden {
+  display: none;
+}
+
+.modal-card .redeem-key-box {
+  text-align: left;
+}
+
+.modal-card .link-btn {
+  margin-top: 14px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  display: block;
+  width: 100%;
+}
+
+.modal-card .link-btn:hover {
+  color: #fff;
+}
+
+/* ---------- Auth: refinamentos ---------- */
+
+.hero-mark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.hero-mark::before {
+  content: "";
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  background: radial-gradient(circle, rgba(88, 101, 242, 0.22), transparent 70%);
+  z-index: 0;
+}
+
+.hero-mark .hero-logo {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
+}
+
+.field-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: left;
+  margin-bottom: -4px;
+  margin-top: 2px;
+}
+
+.field-label .optional {
+  color: var(--text-faint);
+}
+
+.trial-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(88, 101, 242, 0.08);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  color: var(--indigo-bright);
+  margin-bottom: 16px;
+}
+
+.feature-strip {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.feature svg {
+  width: 13px;
+  height: 15px;
+  opacity: 0.7;
+}
+
+/* ---------- Modal: botão primário e afiliados ---------- */
+
+.modal-primary-btn {
+  width: 100%;
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.modal-primary-btn:hover {
+  background: var(--indigo-dim);
+}
+
+.affiliate-hero {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.affiliate-pitch {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0 0 18px 0;
+  text-align: center;
+}
+
+.affiliate-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.stat-box {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.stat-box .stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.stat-box .stat-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.copy-field {
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+.copy-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.copy-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.copy-row input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.copy-btn {
+  background: transparent;
+  border: 1px solid var(--indigo);
+  color: var(--indigo-bright);
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copy-btn:hover {
+  background: var(--indigo);
+  color: #fff;
+}
+
+.copy-btn.copied {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.affiliate-note {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  margin: 4px 0 0 0;
+  line-height: 1.5;
+}
+
+.affiliate-active-view.hidden,
+#affiliate-active-view.hidden,
+#affiliate-join-view.hidden {
+  display: none;
+}

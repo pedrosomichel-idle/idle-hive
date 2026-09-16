@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+  />
+  <title>IdleHive</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Login / Cadastro -->
+    <section id="view-auth" class="view auth-view hidden">
+      <div class="auth-shell">
+        <div class="hero">
+          <div class="hero-mark">
+            <svg class="hero-logo" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="heroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#8b96ff" />
+                  <stop offset="100%" stop-color="#5865f2" />
+                </linearGradient>
+              </defs>
+              <g transform="translate(120,128)">
+                <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90" fill="#3a3f4d" transform="translate(-98,58)" />
+                <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90" fill="#2f3441" transform="translate(98,58)" />
+                <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90" fill="url(#heroGrad)" transform="translate(0,-58)" />
+              </g>
+            </svg>
+          </div>
+          <h1 class="hero-title">IdleHive</h1>
+          <p class="hero-tagline">Todas as suas contas idle, numa colmeia só.</p>
+        </div>
+
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab active" id="tab-login">Entrar</button>
+            <button type="button" class="auth-tab" id="tab-signup">Criar conta</button>
+          </div>
+
+          <div id="login-panel" class="auth-panel">
+            <form id="login-form">
+              <label class="field-label">E-mail</label>
+              <input type="email" id="login-email" placeholder="voce@exemplo.com" required />
+              <label class="field-label">Senha</label>
+              <input type="password" id="login-password" placeholder="••••••••" required />
+              <button type="submit">Entrar</button>
+            </form>
+            <p class="auth-error" id="login-error"></p>
+          </div>
+
+          <div id="signup-panel" class="auth-panel hidden">
+            <div class="trial-badge">
+              <svg width="13" height="15" viewBox="0 0 28 32" fill="none"><polygon points="14,1 27,8 27,24 14,31 1,24 1,8" fill="#5865f2" fill-opacity="0.18" stroke="#7c88ff" stroke-width="1.5"/></svg>
+              8 horas grátis pra testar, sem cartão
+            </div>
+            <form id="signup-form">
+              <label class="field-label">E-mail</label>
+              <input type="email" id="signup-email" placeholder="voce@exemplo.com" required />
+              <label class="field-label">Senha</label>
+              <input type="password" id="signup-password" placeholder="mín. 6 caracteres" required minlength="6" />
+              <label class="field-label">Código de indicação <span class="optional">(opcional)</span></label>
+              <input type="text" id="signup-referral" placeholder="Ex: HIVE-7K2M" autocomplete="off" />
+              <button type="submit">Criar conta e começar</button>
+            </form>
+            <p class="auth-error" id="signup-error"></p>
+          </div>
+        </div>
+
+        <div class="feature-strip">
+          <div class="feature">
+            <svg viewBox="0 0 28 32" fill="none"><polygon points="14,1 27,8 27,24 14,31 1,24 1,8" stroke="#5865f2" stroke-width="1.5"/></svg>
+            <span>Sessões isoladas</span>
+          </div>
+          <div class="feature">
+            <svg viewBox="0 0 28 32" fill="none"><polygon points="14,1 27,8 27,24 14,31 1,24 1,8" stroke="#5865f2" stroke-width="1.5"/></svg>
+            <span>Grade automática</span>
+          </div>
+          <div class="feature">
+            <svg viewBox="0 0 28 32" fill="none"><polygon points="14,1 27,8 27,24 14,31 1,24 1,8" stroke="#5865f2" stroke-width="1.5"/></svg>
+            <span>CPU/RAM por conta</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Licença -->
+    <section id="view-license" class="view auth-view hidden">
+      <div class="auth-shell">
+        <div class="hero">
+          <svg class="hero-logo" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="heroGradLicense" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#8b96ff" />
+                <stop offset="100%" stop-color="#5865f2" />
+              </linearGradient>
+            </defs>
+            <g transform="translate(120,128)">
+              <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90" fill="#3a3f4d" transform="translate(-98,58)" />
+              <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90" fill="#2f3441" transform="translate(98,58)" />
+              <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90" fill="url(#heroGradLicense)" transform="translate(0,-58)" />
+            </g>
+          </svg>
+          <h1 class="hero-title">IdleHive</h1>
+        </div>
+
+        <div class="auth-card">
+          <h2 class="license-heading">Licença</h2>
+          <p class="subtitle" id="license-message">Verificando sua licença...</p>
+
+          <button type="button" id="relogin-btn" class="hidden">Entrar novamente</button>
+          <button type="button" id="buy-license-btn">Comprar licença — R$ 20</button>
+          <button type="button" id="buy-device-slot-btn" class="hidden">Comprar slot extra pra este dispositivo</button>
+          <button type="button" id="refresh-license-btn" class="link-btn">Já paguei, verificar de novo</button>
+
+          <div class="redeem-key-box" id="redeem-key-box">
+            <p class="redeem-key-label">Tem uma chave de ativação?</p>
+            <form id="redeem-key-form">
+              <input type="text" id="redeem-key-input" placeholder="Ex: 7K2M-9PXR-4QWT" autocomplete="off" />
+              <button type="submit">Resgatar chave</button>
+            </form>
+            <p class="auth-error" id="redeem-key-error"></p>
+          </div>
+
+          <button type="button" id="logout-from-license-btn" class="link-btn">Sair da conta</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- App principal -->
+    <section id="view-app" class="view hidden">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <span class="workspace-name">Principal</span>
+          <div class="top-icons">
+            <button type="button" id="toggle-add" class="icon-btn" title="Adicionar conta">✎</button>
+            <button type="button" id="back-to-grid" class="icon-btn" title="Ver todas" disabled>⬚</button>
+            <button type="button" id="affiliate-btn" class="icon-btn" title="Programa de afiliados">◆</button>
+            <button type="button" id="account-btn" class="icon-btn" title="Conta e licença">🔑</button>
+            <button type="button" id="logout-btn" class="icon-btn" title="Sair da conta">⏻</button>
+          </div>
+        </div>
+
+        <form id="add-form" class="add-form hidden">
+          <input type="text" id="account-name" placeholder="Nome da conta" required />
+          <input type="text" id="account-url" placeholder="URL do jogo (ex: exemplo.com)" required />
+          <button type="submit">+ Adicionar conta</button>
+        </form>
+
+        <ul id="account-list" class="account-list"></ul>
+
+        <p class="empty-hint" id="empty-hint">
+          <svg width="28" height="32" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="14,1 27,8 27,24 14,31 1,24 1,8" stroke="#565d68" stroke-width="1.5"/>
+          </svg>
+          Nenhuma conta ainda.<br />Clique no ✎ acima para adicionar.
+        </p>
+
+        <div id="update-banner" class="update-banner hidden">
+          <span>Atualização pronta.</span>
+          <button type="button" id="update-restart-btn">Reiniciar agora</button>
+        </div>
+      </aside>
+
+      <div id="headers-layer"></div>
+
+      <!-- Conta e licença (acessível a qualquer momento: trial, licença paga, etc) -->
+      <div id="account-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>Conta e licença</h2>
+            <button type="button" id="account-modal-close" class="icon-btn">✕</button>
+          </div>
+
+          <p class="panel-hint" id="account-plan-status">Verificando plano...</p>
+
+          <button type="button" id="account-buy-license-btn" class="hidden">Comprar licença — R$ 20</button>
+
+          <div class="redeem-key-box">
+            <p class="redeem-key-label">Tem uma chave de ativação?</p>
+            <form id="account-redeem-key-form">
+              <input type="text" id="account-redeem-key-input" placeholder="Ex: 7K2M-9PXR-4QWT" autocomplete="off" />
+              <button type="submit">Resgatar chave</button>
+            </form>
+            <p class="auth-error" id="account-redeem-key-error"></p>
+          </div>
+
+          <button type="button" id="add-account-window-btn" class="link-btn">+ Adicionar outra conta (nova janela)</button>
+        </div>
+      </div>
+
+      <!-- Programa de afiliados -->
+      <div id="affiliate-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>Programa de afiliados</h2>
+            <button type="button" id="affiliate-modal-close" class="icon-btn">✕</button>
+          </div>
+
+          <!-- Estado: ainda não é afiliado -->
+          <div id="affiliate-join-view">
+            <div class="affiliate-hero">
+              <svg width="40" height="46" viewBox="0 0 28 32" fill="none"><polygon points="14,1 27,8 27,24 14,31 1,24 1,8" fill="#5865f2" fill-opacity="0.12" stroke="#7c88ff" stroke-width="1.5"/><text x="14" y="20" font-size="11" fill="#7c88ff" text-anchor="middle" font-family="monospace">%</text></svg>
+            </div>
+            <p class="affiliate-pitch">
+              Indique o IdleHive e ganhe comissão a cada licença comprada por quem você trouxe. Gere seu código e link agora — é automático.
+            </p>
+            <button type="button" id="affiliate-join-btn" class="modal-primary-btn">Tornar-se afiliado</button>
+            <p class="auth-error" id="affiliate-join-error"></p>
+          </div>
+
+          <!-- Estado: já é afiliado -->
+          <div id="affiliate-active-view" class="hidden">
+            <div class="affiliate-stats">
+              <div class="stat-box">
+                <div class="stat-value" id="aff-activations">0</div>
+                <div class="stat-label">Ativações</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-value" id="aff-pending">R$ 0</div>
+                <div class="stat-label">Pendente</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-value" id="aff-paid">R$ 0</div>
+                <div class="stat-label">Pago</div>
+              </div>
+            </div>
+
+            <div class="copy-field">
+              <label class="field-label">Seu código</label>
+              <div class="copy-row">
+                <input type="text" id="aff-code" readonly />
+                <button type="button" class="copy-btn" data-copy="aff-code">Copiar</button>
+              </div>
+            </div>
+
+            <div class="copy-field">
+              <label class="field-label">Seu link de indicação</label>
+              <div class="copy-row">
+                <input type="text" id="aff-link" readonly />
+                <button type="button" class="copy-btn" data-copy="aff-link">Copiar</button>
+              </div>
+            </div>
+
+            <p class="affiliate-note">Compartilhe o link — quem baixar por ele já vem com seu código preenchido.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

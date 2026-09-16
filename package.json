@@ -1,0 +1,44 @@
+{
+  "name": "idle-hive",
+  "version": "1.0.0",
+  "description": "Gerenciador de multi-contas com sessoes isoladas em uma unica janela (estilo Idle Labs)",
+  "main": "src/main.js",
+  "author": "",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:publish": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "electron-updater": "^6.3.9",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.michel.idlehive",
+    "productName": "IdleHive",
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "files": [
+      "src/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pedrosomichel-idle",
+        "repo": "idle-hive"
+      }
+    ]
+  }
+}

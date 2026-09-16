@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e222b"/>
+      <stop offset="100%" stop-color="#14161a"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b96ff"/>
+      <stop offset="100%" stop-color="#5865f2"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- hexagono: pontos pra um hexagono "flat-top" de raio R centrado na origem -->
+  <!-- R=104: pontos (R,0) girados de 60 em 60 -->
+  <g transform="translate(256,266)">
+    <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90"
+      transform="translate(-98,58)" fill="#3a3f4d" fill-opacity="0.9"/>
+    <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90"
+      transform="translate(98,58)" fill="#2f3441" fill-opacity="0.9"/>
+    <polygon points="52,-90 104,0 52,90 -52,90 -104,0 -52,-90"
+      transform="translate(0,-58)" fill="url(#front)" stroke="#aab2ff" stroke-opacity="0.25" stroke-width="3"/>
+  </g>
+</svg>
