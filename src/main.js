@@ -47,6 +47,8 @@ const PANEL_HEADER_HEIGHT = 34;
 const GAME_BASE_WIDTH = 1366; // resolução de referência assumida pros jogos
 const MIN_ZOOM = 0.3;
 const METRICS_INTERVAL_MS = 2000;
+const LICENSE_RECHECK_INTERVAL_MS = 5 * 60 * 1000; // reconfere a licença a cada 5min
+const LICENSE_WARNING_THRESHOLD_MS = 30 * 60 * 1000; // avisa se faltar 30min ou menos
 
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -69,6 +71,7 @@ const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
 // windowId -> ctx (uma entrada por janela aberta)
 const sessions = new Map();
 let metricsTimer = null;
+let licenseCheckTimer = null;
 let updateReadyFlag = false; // true depois que uma atualização já foi baixada
 
 // ---------------------------------------------------------------------
@@ -376,6 +379,41 @@ async function bootstrap(ctx) {
   syncViewsWithAccounts(ctx);
 }
 
+// Reconfere a licença de uma janela que já está na grade (view 'app').
+// Sem isso, uma licença por prazo (chave promo, trial) que vence com o
+// app aberto nunca seria detectada — o usuário continuaria usando pra
+// sempre, já que bootstrap() só roda em pontos específicos (login,
+// compra, resgate de chave), não continuamente.
+async function recheckLicense(ctx) {
+  if (!ctx || !ctx.window || ctx.window.isDestroyed() || ctx.currentUiView !== 'app') return;
+
+  const storedSession = await getFreshSession(ctx);
+  if (!storedSession || !storedSession.access_token) {
+    await bootstrap(ctx); // sessão sumiu — bootstrap() já sabe cair pra tela de login
+    return;
+  }
+
+  const deviceId = getDeviceId();
+  const status = await fetchLicenseStatus(storedSession.access_token, deviceId);
+
+  if (!status || !status.valid) {
+    // Expirou de verdade com o app aberto — desloga da grade agora,
+    // não deixa continuar usando até o próximo reinício.
+    await bootstrap(ctx);
+    return;
+  }
+
+  // Ainda válida — mas se for trial ou licença por prazo (chave promo),
+  // avisa com antecedência quando estiver perto de vencer.
+  const expiresAtIso = status.trialEndsAt || status.expiresAt || null;
+  if (expiresAtIso) {
+    const msLeft = new Date(expiresAtIso).getTime() - Date.now();
+    if (msLeft > 0 && msLeft <= LICENSE_WARNING_THRESHOLD_MS) {
+      ctx.window.webContents.send('license:expiringSoon', { msLeft, expiresAt: expiresAtIso });
+    }
+  }
+}
+
 function registerAuthIpcHandlers() {
   ipcMain.handle('auth:signIn', async (event, { email, password }) => {
     const ctx = getCtx(event);
@@ -559,6 +597,102 @@ function registerAuthIpcHandlers() {
       return { ok: false, error: err.message };
     }
   });
+
+  // -------------------------------------------------------------------
+  // Mercado RMT
+  // -------------------------------------------------------------------
+  //
+  // Toda regra (licença paga, limites anti-scam, suspensão) é aplicada
+  // no backend — aqui é só o transporte autenticado.
+
+  async function marketplaceFetch(event, path, options = {}) {
+    const ctx = getCtx(event);
+    const storedSession = ctx ? await getFreshSession(ctx) : null;
+    if (!storedSession) return { ok: false, error: 'Não autenticado' };
+
+    try {
+      const res = await net.fetch(`${config.BACKEND_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${storedSession.access_token}`,
+          ...(options.headers || {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: json.error || 'Falha na requisição', data: json };
+      return { ok: true, data: json };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  ipcMain.handle('market:profile', (event) => marketplaceFetch(event, '/api/marketplace/profile'));
+
+  ipcMain.handle('market:setNickname', (event, nickname) =>
+    marketplaceFetch(event, '/api/marketplace/profile', {
+      method: 'POST',
+      body: JSON.stringify({ nickname }),
+    })
+  );
+
+  ipcMain.handle('market:listings', (event, { kind, q } = {}) => {
+    const params = new URLSearchParams();
+    if (kind) params.set('kind', kind);
+    if (q) params.set('q', q);
+    const qs = params.toString();
+    return marketplaceFetch(event, `/api/marketplace/listings${qs ? `?${qs}` : ''}`);
+  });
+
+  ipcMain.handle('market:createListing', (event, listing) =>
+    marketplaceFetch(event, '/api/marketplace/listings', {
+      method: 'POST',
+      body: JSON.stringify(listing),
+    })
+  );
+
+  ipcMain.handle('market:updateListing', (event, { id, status }) =>
+    marketplaceFetch(event, '/api/marketplace/listings', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, status }),
+    })
+  );
+
+  ipcMain.handle('market:conversations', (event) =>
+    marketplaceFetch(event, '/api/marketplace/conversations')
+  );
+
+  ipcMain.handle('market:openConversation', (event, listingId) =>
+    marketplaceFetch(event, '/api/marketplace/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ listingId }),
+    })
+  );
+
+  ipcMain.handle('market:messages', (event, conversationId) =>
+    marketplaceFetch(event, `/api/marketplace/messages?conversationId=${encodeURIComponent(conversationId)}`)
+  );
+
+  ipcMain.handle('market:sendMessage', (event, { conversationId, body }) =>
+    marketplaceFetch(event, '/api/marketplace/messages', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId, body }),
+    })
+  );
+
+  ipcMain.handle('market:confirmTransaction', (event, conversationId) =>
+    marketplaceFetch(event, '/api/marketplace/transaction', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId }),
+    })
+  );
+
+  ipcMain.handle('market:report', (event, { conversationId, reason }) =>
+    marketplaceFetch(event, '/api/marketplace/report', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId, reason }),
+    })
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -1146,6 +1280,13 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    // Remove a barra de menu padrão do Electron (File/Edit/View/Window/
+    // Help) — é feita pra apps de desenvolvedor, não faz sentido pro
+    // usuário final do IdleHive. Nossos próprios menus de botão direito
+    // (Menu.buildFromTemplate + popup) continuam funcionando normal —
+    // isso só remove a barra fixa no topo da janela.
+    Menu.setApplicationMenu(null);
+
     registerAuthIpcHandlers();
     registerAccountsIpcHandlers();
     createSessionWindow(true);
@@ -1163,6 +1304,12 @@ if (!gotSingleInstanceLock) {
       }
     }, METRICS_INTERVAL_MS);
 
+    licenseCheckTimer = setInterval(() => {
+      for (const ctx of sessions.values()) {
+        recheckLicense(ctx);
+      }
+    }, LICENSE_RECHECK_INTERVAL_MS);
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createSessionWindow(true);
@@ -1172,6 +1319,7 @@ if (!gotSingleInstanceLock) {
 
   app.on('before-quit', () => {
     if (metricsTimer) clearInterval(metricsTimer);
+    if (licenseCheckTimer) clearInterval(licenseCheckTimer);
   });
 }
 

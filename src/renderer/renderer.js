@@ -176,6 +176,11 @@ window.idleHive.onSetView(({ view, data }) => {
   if (view === 'app') {
     latestLicenseStatus = data;
     renderAccountModal();
+    // Uma renovação (compra, chave resgatada) sempre passa por um
+    // bootstrap novo antes de chegar aqui — se o aviso de expiração
+    // ainda estava na tela, esconde: a reconferência periódica mostra
+    // de novo se a licença nova também estiver perto de vencer.
+    document.getElementById('expiry-banner').classList.add('hidden');
   }
 });
 
@@ -783,6 +788,27 @@ window.idleHive.onUpdateReady(() => {
   document.getElementById('update-banner').classList.remove('hidden');
 });
 
+// Aviso de licença perto de vencer (trial ou chave promo) — o main
+// processo reconfere a cada 5min enquanto o app está na grade, e manda
+// isso quando faltar 30min ou menos. Clicar em "Renovar agora" abre o
+// mesmo modal de conta/licença que o ícone 🔑 já abre.
+function formatMsLeft(ms) {
+  const totalMinutes = Math.max(1, Math.round(ms / 60000));
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+}
+
+window.idleHive.onLicenseExpiringSoon(({ msLeft }) => {
+  document.getElementById('expiry-text').textContent = `Sua licença expira em ${formatMsLeft(msLeft)}.`;
+  document.getElementById('expiry-banner').classList.remove('hidden');
+});
+
+document.getElementById('expiry-renew-btn').addEventListener('click', () => {
+  accountBtn.click();
+});
+
 // ---------------------------------------------------------------------
 // Modal "Programa de afiliados"
 // ---------------------------------------------------------------------
@@ -904,3 +930,458 @@ newCategoryForm.addEventListener('submit', async (event) => {
 
 window.idleHive.onStateUpdate(render);
 window.idleHive.onStartRename(startRename);
+
+// ---------------------------------------------------------------------
+// Mercado RMT
+// ---------------------------------------------------------------------
+//
+// A tela do Mercado é um overlay em tela cheia. Como os BrowserViews dos
+// jogos são desenhados por cima de qualquer HTML, ela também precisa
+// desanexá-los (setModalOpen) enquanto está aberta — mesma mecânica dos
+// modais de conta/afiliados.
+
+const marketBtn = document.getElementById('market-btn');
+const marketOverlay = document.getElementById('market-overlay');
+const marketClose = document.getElementById('market-close');
+const marketLocked = document.getElementById('market-locked');
+const marketLockedText = document.getElementById('market-locked-text');
+const marketNicknameView = document.getElementById('market-nickname');
+const marketMain = document.getElementById('market-main');
+const marketChat = document.getElementById('market-chat');
+const marketMyNickname = document.getElementById('market-my-nickname');
+const marketMyTier = document.getElementById('market-my-tier');
+
+const nicknameForm = document.getElementById('nickname-form');
+const nicknameInput = document.getElementById('nickname-input');
+const nicknameError = document.getElementById('nickname-error');
+
+const listingsList = document.getElementById('listings-list');
+const conversationsList = document.getElementById('conversations-list');
+const listingSearch = document.getElementById('listing-search');
+const listingForm = document.getElementById('listing-form');
+const listingError = document.getElementById('listing-error');
+
+const chatMessages = document.getElementById('chat-messages');
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+const chatNickname = document.getElementById('chat-nickname');
+const chatTier = document.getElementById('chat-tier');
+const chatPairNote = document.getElementById('chat-pair-note');
+const chatTransaction = document.getElementById('chat-transaction');
+
+let marketFilterKind = '';
+let marketSearchTerm = '';
+let listingKind = 'venda';
+let openConversationId = null;
+let chatPollTimer = null;
+let lastMessageCount = 0;
+
+function tierBadge(el, reputation) {
+  if (!reputation) {
+    el.textContent = '';
+    el.className = 'tier-badge';
+    return;
+  }
+  el.textContent = `${reputation.tier.label} · ${reputation.total}`;
+  el.className = `tier-badge ${reputation.tier.key}`;
+}
+
+function showMarketState(state) {
+  marketLocked.classList.toggle('hidden', state !== 'locked');
+  marketNicknameView.classList.toggle('hidden', state !== 'nickname');
+  marketMain.classList.toggle('hidden', state !== 'main');
+  marketChat.classList.toggle('hidden', state !== 'chat');
+}
+
+async function openMarket() {
+  marketOverlay.classList.remove('hidden');
+  window.idleHive.setModalOpen(true);
+
+  const result = await window.idleHive.marketProfile();
+
+  if (!result.ok) {
+    marketLockedText.textContent = result.error || 'Não foi possível abrir o Mercado.';
+    marketMyNickname.textContent = '';
+    tierBadge(marketMyTier, null);
+    showMarketState('locked');
+    return;
+  }
+
+  const data = result.data;
+  if (data.needsNickname) {
+    marketMyNickname.textContent = '';
+    tierBadge(marketMyTier, null);
+    showMarketState('nickname');
+    nicknameInput.focus();
+    return;
+  }
+
+  marketMyNickname.textContent = data.nickname;
+  tierBadge(marketMyTier, data.reputation);
+  showMarketState('main');
+  switchMarketTab('listings');
+}
+
+function closeMarket() {
+  stopChatPolling();
+  openConversationId = null;
+  marketOverlay.classList.add('hidden');
+  window.idleHive.setModalOpen(false);
+}
+
+marketBtn.addEventListener('click', openMarket);
+marketClose.addEventListener('click', closeMarket);
+
+nicknameForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  nicknameError.textContent = '';
+  const nickname = nicknameInput.value.trim();
+  if (!nickname) return;
+
+  const result = await window.idleHive.marketSetNickname(nickname);
+  if (!result.ok) {
+    nicknameError.textContent = result.error || 'Não foi possível salvar o apelido.';
+    return;
+  }
+  nicknameInput.value = '';
+  await openMarket();
+});
+
+// --- abas ---
+
+function switchMarketTab(tab) {
+  document.querySelectorAll('.market-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('tab-listings').classList.toggle('hidden', tab !== 'listings');
+  document.getElementById('tab-chats').classList.toggle('hidden', tab !== 'chats');
+  document.getElementById('tab-new').classList.toggle('hidden', tab !== 'new');
+
+  if (tab === 'listings') loadListings();
+  if (tab === 'chats') loadConversations();
+}
+
+document.querySelectorAll('.market-tab').forEach((btn) => {
+  btn.addEventListener('click', () => switchMarketTab(btn.dataset.tab));
+});
+
+// --- anúncios ---
+
+async function loadListings() {
+  listingsList.innerHTML = '<p class="market-empty">Carregando…</p>';
+  const result = await window.idleHive.marketListings({ kind: marketFilterKind, q: marketSearchTerm });
+
+  if (!result.ok) {
+    listingsList.innerHTML = `<p class="market-empty">${escapeHtml(result.error || 'Falha ao carregar anúncios.')}</p>`;
+    return;
+  }
+
+  const listings = result.data.listings || [];
+  if (listings.length === 0) {
+    listingsList.innerHTML = '<p class="market-empty">Nenhum anúncio por aqui ainda.<br />Seja o primeiro a anunciar.</p>';
+    return;
+  }
+
+  listingsList.innerHTML = '';
+  listings.forEach((l) => {
+    const card = document.createElement('div');
+    card.className = 'listing-card';
+
+    const main = document.createElement('div');
+    main.className = 'listing-main';
+    main.innerHTML = `
+      <span class="listing-kind ${l.kind}">${l.kind === 'venda' ? 'Vendendo' : 'Comprando'}</span>
+      <p class="listing-title">${escapeHtml(l.title)}</p>
+      ${l.price_text ? `<p class="listing-price">${escapeHtml(l.price_text)}</p>` : ''}
+      ${l.description ? `<p class="listing-desc">${escapeHtml(l.description)}</p>` : ''}
+      <div class="listing-meta">
+        <span>${escapeHtml(l.nickname)}</span>
+        <span class="tier-badge ${l.reputation.tier.key}">${l.reputation.tier.label} · ${l.reputation.total}</span>
+        ${l.character_name ? `<span>char: ${escapeHtml(l.character_name)}</span>` : ''}
+      </div>
+    `;
+
+    const side = document.createElement('div');
+    side.className = 'listing-side';
+
+    if (l.isMine) {
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'secondary';
+      closeBtn.textContent = 'Encerrar';
+      closeBtn.addEventListener('click', async () => {
+        await window.idleHive.marketUpdateListing(l.id, 'concluido');
+        loadListings();
+      });
+      side.appendChild(closeBtn);
+    } else {
+      const talkBtn = document.createElement('button');
+      talkBtn.type = 'button';
+      talkBtn.textContent = 'Negociar';
+      talkBtn.addEventListener('click', async () => {
+        const res = await window.idleHive.marketOpenConversation(l.id);
+        if (!res.ok) {
+          listingsList.insertAdjacentHTML('afterbegin', `<p class="market-empty">${escapeHtml(res.error)}</p>`);
+          return;
+        }
+        openChat(res.data.conversationId);
+      });
+      side.appendChild(talkBtn);
+    }
+
+    card.appendChild(main);
+    card.appendChild(side);
+    listingsList.appendChild(card);
+  });
+}
+
+document.querySelectorAll('.filter-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    marketFilterKind = chip.dataset.kind;
+    loadListings();
+  });
+});
+
+let searchDebounce = null;
+listingSearch.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    marketSearchTerm = listingSearch.value.trim();
+    loadListings();
+  }, 350);
+});
+
+// --- criar anúncio ---
+
+document.querySelectorAll('.kind-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.kind-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    listingKind = btn.dataset.kind;
+  });
+});
+
+listingForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  listingError.textContent = '';
+
+  const payload = {
+    kind: listingKind,
+    title: document.getElementById('listing-title').value.trim(),
+    priceText: document.getElementById('listing-price').value.trim(),
+    characterName: document.getElementById('listing-character').value.trim(),
+    description: document.getElementById('listing-description').value.trim(),
+  };
+
+  const result = await window.idleHive.marketCreateListing(payload);
+  if (!result.ok) {
+    listingError.textContent = result.error || 'Não foi possível publicar.';
+    return;
+  }
+
+  listingForm.reset();
+  switchMarketTab('listings');
+});
+
+// --- conversas ---
+
+async function loadConversations() {
+  conversationsList.innerHTML = '<p class="market-empty">Carregando…</p>';
+  const result = await window.idleHive.marketConversations();
+
+  if (!result.ok) {
+    conversationsList.innerHTML = `<p class="market-empty">${escapeHtml(result.error || 'Falha ao carregar.')}</p>`;
+    return;
+  }
+
+  const conversations = result.data.conversations || [];
+  if (conversations.length === 0) {
+    conversationsList.innerHTML = '<p class="market-empty">Você ainda não tem conversas.<br />Abra um anúncio e clique em "Negociar".</p>';
+    return;
+  }
+
+  conversationsList.innerHTML = '';
+  conversations.forEach((c) => {
+    const card = document.createElement('div');
+    card.className = 'conversation-card';
+    card.innerHTML = `
+      <div class="listing-main">
+        <p class="listing-title">${escapeHtml(c.other.nickname)}</p>
+        ${c.listingTitle ? `<p class="listing-desc">${escapeHtml(c.listingTitle)}</p>` : ''}
+        <div class="listing-meta">
+          <span class="tier-badge ${c.other.reputation.tier.key}">${c.other.reputation.tier.label} · ${c.other.reputation.total}</span>
+        </div>
+      </div>
+    `;
+    const side = document.createElement('div');
+    side.className = 'listing-side';
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.textContent = 'Abrir';
+    openBtn.addEventListener('click', () => openChat(c.id));
+    side.appendChild(openBtn);
+    card.appendChild(side);
+    conversationsList.appendChild(card);
+  });
+}
+
+// --- chat ---
+
+function stopChatPolling() {
+  if (chatPollTimer) {
+    clearInterval(chatPollTimer);
+    chatPollTimer = null;
+  }
+}
+
+async function openChat(conversationId) {
+  openConversationId = conversationId;
+  lastMessageCount = 0;
+  chatMessages.innerHTML = '';
+  showMarketState('chat');
+  await refreshChat();
+  stopChatPolling();
+  // Sem Realtime: busca mensagens novas a cada 4s enquanto o chat está
+  // aberto. Latência irrelevante pra negociar item, e evita montar
+  // políticas de RLS + um segundo caminho de autenticação.
+  chatPollTimer = setInterval(refreshChat, 4000);
+}
+
+document.getElementById('chat-back').addEventListener('click', () => {
+  stopChatPolling();
+  openConversationId = null;
+  showMarketState('main');
+  switchMarketTab('chats');
+});
+
+async function refreshChat() {
+  if (!openConversationId) return;
+  const result = await window.idleHive.marketMessages(openConversationId);
+  if (!result.ok) return;
+
+  const data = result.data;
+  chatNickname.textContent = data.other.nickname;
+  tierBadge(chatTier, data.other.reputation);
+
+  chatPairNote.textContent =
+    data.pairCountedTransactions > 0
+      ? `Vocês já registraram ${data.pairCountedTransactions} transação(ões) entre si.`
+      : 'Primeira negociação entre vocês.';
+
+  const messages = data.messages || [];
+  // Só redesenha quando chegou mensagem nova — evita piscar a cada 4s.
+  if (messages.length !== lastMessageCount) {
+    lastMessageCount = messages.length;
+    chatMessages.innerHTML = '';
+    messages.forEach((m) => {
+      const el = document.createElement('div');
+      el.className = `msg ${m.mine ? 'mine' : 'theirs'}`;
+      const time = new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      el.innerHTML = `${escapeHtml(m.body)}<span class="msg-time">${time}</span>`;
+      chatMessages.appendChild(el);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  renderTransactionBar(data.transaction);
+}
+
+function renderTransactionBar(tx) {
+  chatTransaction.className = 'chat-transaction';
+  chatTransaction.innerHTML = '';
+
+  if (tx.completed) {
+    chatTransaction.classList.add('done');
+    chatTransaction.textContent = tx.counted
+      ? '✓ Transação confirmada pelos dois lados e somada à reputação.'
+      : `✓ Transação confirmada. ${tx.notCountedReason || ''}`;
+    return;
+  }
+
+  const info = document.createElement('span');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'Confirmar transação';
+
+  if (!tx.canConfirm) {
+    info.textContent = `Converse um pouco antes de confirmar (mínimo ${tx.exchange.required} mensagens de cada lado).`;
+    btn.disabled = true;
+  } else if (tx.iConfirmed) {
+    info.textContent = 'Você confirmou. Aguardando o outro lado.';
+    btn.disabled = true;
+    btn.textContent = 'Aguardando';
+  } else if (tx.theyConfirmed) {
+    info.textContent = 'O outro lado já confirmou. Confirme também para fechar.';
+  } else {
+    info.textContent = 'Fecharam negócio? Os dois precisam confirmar.';
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const result = await window.idleHive.marketConfirmTransaction(openConversationId);
+    if (!result.ok) {
+      info.textContent = result.error || 'Não foi possível confirmar.';
+      btn.disabled = false;
+      return;
+    }
+    await refreshChat();
+    // Reputação pode ter mudado — atualiza o selo do topo.
+    const profile = await window.idleHive.marketProfile();
+    if (profile.ok && profile.data.reputation) tierBadge(marketMyTier, profile.data.reputation);
+  });
+
+  chatTransaction.appendChild(info);
+  chatTransaction.appendChild(btn);
+}
+
+chatForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const body = chatInput.value.trim();
+  if (!body || !openConversationId) return;
+
+  chatInput.value = '';
+  const result = await window.idleHive.marketSendMessage(openConversationId, body);
+  if (!result.ok) {
+    chatInput.value = body; // devolve o texto pro usuário não perder
+    return;
+  }
+  await refreshChat();
+});
+
+// Denúncia com campo inline — window.prompt() não é implementado pelo
+// Electron (não mostra nada), então nunca usamos ele aqui.
+const reportBox = document.getElementById('report-box');
+const reportInput = document.getElementById('report-input');
+const reportFeedback = document.getElementById('report-feedback');
+
+document.getElementById('chat-report').addEventListener('click', () => {
+  reportBox.classList.toggle('hidden');
+  reportFeedback.textContent = '';
+  if (!reportBox.classList.contains('hidden')) reportInput.focus();
+});
+
+document.getElementById('report-cancel').addEventListener('click', () => {
+  reportBox.classList.add('hidden');
+  reportInput.value = '';
+});
+
+document.getElementById('report-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!openConversationId) return;
+  const reason = reportInput.value.trim();
+  if (reason.length < 10) {
+    reportFeedback.textContent = 'Descreva com pelo menos 10 caracteres.';
+    return;
+  }
+
+  const result = await window.idleHive.marketReport(openConversationId, reason);
+  if (!result.ok) {
+    reportFeedback.textContent = result.error || 'Não foi possível enviar a denúncia.';
+    return;
+  }
+  reportInput.value = '';
+  reportBox.classList.add('hidden');
+  chatPairNote.textContent = 'Denúncia enviada. Nossa equipe vai analisar.';
+});

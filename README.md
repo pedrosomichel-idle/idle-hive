@@ -225,6 +225,38 @@ redesenho é suspenso — sem isso, o input seria destruído no meio da
 digitação, perdendo o texto e o cursor. O formulário de nova aba fica
 fora da área redesenhada pelo mesmo motivo.
 
+## Mercado RMT
+
+Tela acessível pelo botão "Mercado RMT" na sidebar (acima das
+categorias). **Exclusivo para licença paga** — trial é bloqueado, e a
+checagem acontece no servidor a cada ação, não só na interface.
+
+Fluxo: escolher apelido na primeira entrada → ver anúncios → "Negociar"
+abre um chat direto com quem anunciou → depois da troca (feita dentro do
+jogo), os **dois lados confirmam** e a transação entra na reputação.
+
+Selos por transações confirmadas: Bronze (0) · Prata (5) · Ouro (15) ·
+Diamante (40) · **Platina (100+, topo)**.
+
+Regras anti-scam, todas aplicadas no backend:
+- Confirmação sempre individual — só fecha quando os dois confirmam
+- Mesmo par: no máximo 1 transação contabilizada a cada 24h
+- Teto de 5 transações contabilizadas por pessoa por dia
+- Mínimo de 3 mensagens de cada lado antes de liberar o botão confirmar
+- Contador visível de quantas transações aquele par já fez entre si
+
+Reputação vive no **login do IdleHive (a pessoa)**, nunca no personagem
+do jogo — jogador tem dezenas de chars, e trocar de char não pode zerar
+a ficha.
+
+Denúncias vão pra fila de moderação em `/admin/reports`, onde dá pra
+suspender alguém do Mercado por X dias sem banir a conta inteira.
+
+**Chat por polling, não Realtime**: o app busca mensagens novas a cada
+4s enquanto o chat está aberto. Supabase Realtime exigiria políticas de
+RLS e um segundo caminho de autenticação — complexidade que não se paga
+pra uma negociação de item, onde 4s de latência é irrelevante.
+
 ## Otimizações de performance
 
 - **Painéis fora de tela não pesam à toa**: quando você usa "Expandir"
@@ -280,6 +312,31 @@ Corrigido: todas as chamadas de rede do app (Supabase Auth e o backend
 de licenciamento) agora usam `net.fetch` do próprio Electron, que
 roda sobre o mesmo motor do Chromium — e por isso confia na mesma
 lista de certificados que um navegador normal confiaria.
+
+## Licença expira sozinha, mesmo com o app aberto
+
+Antes, a licença só era conferida em pontos específicos (login, compra,
+resgate de chave) — se o app ficasse aberto além do prazo de um trial
+ou de uma chave por tempo, o usuário continuava usando pra sempre, sem
+nunca ser desconectado de verdade.
+
+Corrigido: enquanto uma janela está na grade, o app reconfere a licença
+a cada 5 minutos. Se ela realmente expirou, a janela volta pra tela de
+licença na hora — sem esperar reiniciar o app. E se faltar 30 minutos
+ou menos pra vencer (trial ou chave por prazo), aparece um aviso
+discreto na sidebar ("Sua licença expira em 28 min") com um botão
+"Renovar agora", que abre o mesmo modal de conta/licença do ícone 🔑.
+Licença paga (`plan: 'standard'`) nunca expira, então nunca dispara
+esse aviso.
+
+## Barra de menu removida
+
+O Electron mostra por padrão uma barra (File / Edit / View / Window /
+Help) feita pra quem está desenvolvendo, sem utilidade nenhuma pro
+usuário final. Removida com `Menu.setApplicationMenu(null)` — os menus
+de botão direito (renomear, favoritar, mover de categoria, etc)
+continuam funcionando normal, são menus separados (`Menu.popup()`), não
+afetados por essa remoção.
 
 ## Sessão expirada vs. sem licença
 

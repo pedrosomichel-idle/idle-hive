@@ -171,6 +171,15 @@
           </div>
         </div>
 
+        <button type="button" id="market-btn" class="market-bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="20" r="1.4" />
+            <circle cx="18" cy="20" r="1.4" />
+            <path d="M2 3h2.5l2.4 12.2a1.6 1.6 0 0 0 1.6 1.3h8.8a1.6 1.6 0 0 0 1.6-1.3L21 7H5.5" />
+          </svg>
+          <span>Mercado RMT</span>
+        </button>
+
         <!-- Lista de categorias (cada uma com suas abas, recolhível) -->
         <div id="category-list" class="category-list"></div>
 
@@ -191,9 +200,16 @@
           <button type="submit" title="Criar categoria">+</button>
         </form>
 
-        <div id="update-banner" class="update-banner hidden">
-          <span>Atualização pronta.</span>
-          <button type="button" id="update-restart-btn">Reiniciar agora</button>
+        <div class="bottom-banners">
+          <div id="expiry-banner" class="expiry-banner hidden">
+            <span id="expiry-text"></span>
+            <button type="button" id="expiry-renew-btn">Renovar agora</button>
+          </div>
+
+          <div id="update-banner" class="update-banner hidden">
+            <span>Atualização pronta.</span>
+            <button type="button" id="update-restart-btn">Reiniciar agora</button>
+          </div>
         </div>
       </aside>
 
@@ -221,6 +237,119 @@
           </div>
 
           <button type="button" id="add-account-window-btn" class="link-btn">+ Adicionar outra conta (nova janela)</button>
+        </div>
+      </div>
+
+      <!-- Mercado RMT -->
+      <div id="market-overlay" class="market-overlay hidden">
+        <div class="market-shell">
+          <header class="market-header">
+            <div class="market-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="20" r="1.4" />
+                <circle cx="18" cy="20" r="1.4" />
+                <path d="M2 3h2.5l2.4 12.2a1.6 1.6 0 0 0 1.6 1.3h8.8a1.6 1.6 0 0 0 1.6-1.3L21 7H5.5" />
+              </svg>
+              <h2>Mercado RMT</h2>
+              <span class="market-game">Huntera</span>
+            </div>
+            <div class="market-me">
+              <span id="market-my-nickname"></span>
+              <span id="market-my-tier" class="tier-badge"></span>
+              <button type="button" id="market-close" class="icon-btn">✕</button>
+            </div>
+          </header>
+
+          <!-- Estado: sem acesso (trial / suspenso) -->
+          <div id="market-locked" class="market-locked hidden">
+            <p id="market-locked-text"></p>
+          </div>
+
+          <!-- Estado: primeira entrada, escolher apelido -->
+          <div id="market-nickname" class="market-nickname hidden">
+            <h3>Escolha seu apelido no Mercado</h3>
+            <p>É como os outros jogadores vão te ver. Sua reputação fica ligada a ele.</p>
+            <form id="nickname-form">
+              <input type="text" id="nickname-input" placeholder="Ex: MichelTrader" maxlength="20" autocomplete="off" />
+              <button type="submit">Entrar no Mercado</button>
+            </form>
+            <p class="auth-error" id="nickname-error"></p>
+          </div>
+
+          <!-- Estado: mercado liberado -->
+          <div id="market-main" class="market-main hidden">
+            <nav class="market-tabs">
+              <button type="button" class="market-tab active" data-tab="listings">Anúncios</button>
+              <button type="button" class="market-tab" data-tab="chats">Minhas conversas</button>
+              <button type="button" class="market-tab" data-tab="new">Anunciar</button>
+            </nav>
+
+            <!-- Aba: anúncios -->
+            <section id="tab-listings" class="market-panel">
+              <div class="market-filters">
+                <button type="button" class="filter-chip active" data-kind="">Todos</button>
+                <button type="button" class="filter-chip" data-kind="venda">Vendendo</button>
+                <button type="button" class="filter-chip" data-kind="compra">Comprando</button>
+                <input type="text" id="listing-search" placeholder="Buscar item..." autocomplete="off" />
+              </div>
+              <div id="listings-list" class="listings-list"></div>
+            </section>
+
+            <!-- Aba: minhas conversas -->
+            <section id="tab-chats" class="market-panel hidden">
+              <div id="conversations-list" class="conversations-list"></div>
+            </section>
+
+            <!-- Aba: anunciar -->
+            <section id="tab-new" class="market-panel hidden">
+              <form id="listing-form" class="listing-form">
+                <div class="kind-toggle">
+                  <button type="button" class="kind-btn active" data-kind="venda">Estou vendendo</button>
+                  <button type="button" class="kind-btn" data-kind="compra">Estou comprando</button>
+                </div>
+                <label class="field-label">O que é <span class="optional">(obrigatório)</span></label>
+                <input type="text" id="listing-title" maxlength="80" placeholder="Ex: Magic Sword +3" required />
+                <label class="field-label">Preço ou troca</label>
+                <input type="text" id="listing-price" maxlength="60" placeholder="Ex: 500k gold, ou troco por Boots" />
+                <label class="field-label">Seu personagem <span class="optional">(opcional)</span></label>
+                <input type="text" id="listing-character" maxlength="40" placeholder="Com qual char negociar no jogo" />
+                <label class="field-label">Detalhes <span class="optional">(opcional)</span></label>
+                <textarea id="listing-description" maxlength="500" rows="3" placeholder="Informações extras"></textarea>
+                <button type="submit">Publicar anúncio</button>
+                <p class="auth-error" id="listing-error"></p>
+              </form>
+            </section>
+          </div>
+
+          <!-- Chat de uma conversa -->
+          <div id="market-chat" class="market-chat hidden">
+            <div class="chat-header">
+              <button type="button" id="chat-back" class="ghost-btn">← Voltar</button>
+              <div class="chat-who">
+                <strong id="chat-nickname"></strong>
+                <span id="chat-tier" class="tier-badge"></span>
+              </div>
+              <button type="button" id="chat-report" class="ghost-btn danger-btn">Denunciar</button>
+            </div>
+            <p id="chat-pair-note" class="chat-pair-note"></p>
+
+            <div id="report-box" class="report-box hidden">
+              <form id="report-form">
+                <textarea id="report-input" rows="2" maxlength="400" placeholder="O que aconteceu? (mínimo 10 caracteres)"></textarea>
+                <div class="report-actions">
+                  <button type="button" id="report-cancel" class="ghost-btn">Cancelar</button>
+                  <button type="submit">Enviar denúncia</button>
+                </div>
+              </form>
+              <p class="auth-error" id="report-feedback"></p>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div id="chat-transaction" class="chat-transaction"></div>
+            <form id="chat-form" class="chat-form">
+              <input type="text" id="chat-input" placeholder="Escreva sua mensagem..." maxlength="800" autocomplete="off" />
+              <button type="submit">Enviar</button>
+            </form>
+          </div>
         </div>
       </div>
 

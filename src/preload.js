@@ -21,6 +21,19 @@ contextBridge.exposeInMainWorld('idleHive', {
   restartToUpdate: () => ipcRenderer.invoke('app:restartToUpdate'),
   affiliateMe: () => ipcRenderer.invoke('affiliate:me'),
   affiliateJoin: () => ipcRenderer.invoke('affiliate:join'),
+
+  // Mercado RMT
+  marketProfile: () => ipcRenderer.invoke('market:profile'),
+  marketSetNickname: (nickname) => ipcRenderer.invoke('market:setNickname', nickname),
+  marketListings: (filters) => ipcRenderer.invoke('market:listings', filters),
+  marketCreateListing: (listing) => ipcRenderer.invoke('market:createListing', listing),
+  marketUpdateListing: (id, status) => ipcRenderer.invoke('market:updateListing', { id, status }),
+  marketConversations: () => ipcRenderer.invoke('market:conversations'),
+  marketOpenConversation: (listingId) => ipcRenderer.invoke('market:openConversation', listingId),
+  marketMessages: (conversationId) => ipcRenderer.invoke('market:messages', conversationId),
+  marketSendMessage: (conversationId, body) => ipcRenderer.invoke('market:sendMessage', { conversationId, body }),
+  marketConfirmTransaction: (conversationId) => ipcRenderer.invoke('market:confirmTransaction', conversationId),
+  marketReport: (conversationId, reason) => ipcRenderer.invoke('market:report', { conversationId, reason }),
   buyLicense: () => ipcRenderer.invoke('license:checkout'),
   buyDeviceSlot: () => ipcRenderer.invoke('license:checkoutDeviceSlot'),
   redeemKey: (code) => ipcRenderer.invoke('license:redeemKey', code),
@@ -56,6 +69,11 @@ contextBridge.exposeInMainWorld('idleHive', {
     const listener = () => callback();
     ipcRenderer.on('app:updateReady', listener);
     return () => ipcRenderer.removeListener('app:updateReady', listener);
+  },
+  onLicenseExpiringSoon: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('license:expiringSoon', listener);
+    return () => ipcRenderer.removeListener('license:expiringSoon', listener);
   },
   onSetView: (callback) => {
     const listener = (_event, payload) => callback(payload);

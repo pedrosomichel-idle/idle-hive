@@ -573,8 +573,15 @@ body {
   opacity: 0.5;
 }
 
-.update-banner {
+.bottom-banners {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-banner {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -604,6 +611,38 @@ body {
 
 .update-banner button:hover {
   background: var(--indigo-dim);
+}
+
+.expiry-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 193, 72, 0.08);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: #e6c78a;
+  flex-shrink: 0;
+}
+
+.expiry-banner.hidden {
+  display: none;
+}
+
+.expiry-banner button {
+  background: var(--amber);
+  border: none;
+  color: #1a1305;
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.expiry-banner button:hover {
+  filter: brightness(1.1);
 }
 
 /* ---------- Camada de headers dos painéis ---------- */
@@ -1189,4 +1228,656 @@ body {
 
 .new-category-form button:hover {
   background: var(--indigo-dim);
+}
+
+/* ---------- Barra do Mercado na sidebar ---------- */
+
+.market-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.18), rgba(88, 101, 242, 0.05));
+  border: 1px solid rgba(88, 101, 242, 0.45);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.market-bar:hover {
+  border-color: var(--indigo);
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.28), rgba(88, 101, 242, 0.08));
+}
+
+.market-bar svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--indigo-bright);
+}
+
+/* ---------- Tela do Mercado ---------- */
+
+.market-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 60;
+  display: flex;
+}
+
+.market-overlay.hidden {
+  display: none;
+}
+
+.market-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 18px 24px 24px 24px;
+  overflow: hidden;
+}
+
+.market-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.market-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.market-title svg {
+  width: 20px;
+  height: 20px;
+  color: var(--indigo-bright);
+}
+
+.market-title h2 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.market-game {
+  font-size: 11px;
+  background: var(--surface-3);
+  color: var(--text-dim);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.market-me {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.tier-badge::before {
+  content: "";
+  width: 9px;
+  height: 10px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: currentColor;
+}
+
+.tier-badge.bronze { color: #c98a5c; }
+.tier-badge.prata { color: #c3ccd8; }
+.tier-badge.ouro { color: var(--amber); }
+.tier-badge.diamante { color: #5fd6e8; }
+.tier-badge.platina { color: #e8f0ff; }
+
+/* --- estados --- */
+
+.market-locked,
+.market-nickname {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 0 20px;
+}
+
+.market-locked.hidden,
+.market-nickname.hidden,
+.market-main.hidden,
+.market-chat.hidden {
+  display: none;
+}
+
+.market-nickname h3 {
+  font-size: 18px;
+  color: var(--text);
+  margin: 0;
+}
+
+.market-nickname p {
+  margin: 0;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.market-nickname form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.market-nickname input {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  font-size: 14px;
+  width: 240px;
+}
+
+.market-nickname input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.market-nickname button,
+.listing-form button[type="submit"],
+.chat-form button {
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.market-nickname button:hover,
+.listing-form button[type="submit"]:hover,
+.chat-form button:hover {
+  background: var(--indigo-dim);
+}
+
+/* --- abas --- */
+
+.market-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.market-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 14px 0;
+  flex-shrink: 0;
+}
+
+.market-tab {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.market-tab:hover {
+  background: var(--surface-2);
+  color: #fff;
+}
+
+.market-tab.active {
+  background: var(--indigo);
+  color: #fff;
+  font-weight: 600;
+}
+
+.market-panel {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.market-panel.hidden {
+  display: none;
+}
+
+/* --- filtros --- */
+
+.market-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.filter-chip.active {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
+}
+
+#listing-search {
+  flex: 1;
+  min-width: 160px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+#listing-search:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+/* --- lista de anúncios --- */
+
+.listings-list,
+.conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.listing-card,
+.conversation-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.listing-card:hover,
+.conversation-card:hover {
+  border-color: var(--border-soft);
+}
+
+.listing-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.listing-kind {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 7px;
+}
+
+.listing-kind.venda {
+  background: rgba(59, 165, 93, 0.16);
+  color: #57c47c;
+}
+
+.listing-kind.compra {
+  background: rgba(88, 101, 242, 0.16);
+  color: var(--indigo-bright);
+}
+
+.listing-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 5px 0;
+}
+
+.listing-price {
+  font-size: 13px;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  margin: 0 0 6px 0;
+}
+
+.listing-desc {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0 0 8px 0;
+}
+
+.listing-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  flex-wrap: wrap;
+}
+
+.listing-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.listing-side button {
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.listing-side button:hover {
+  background: var(--indigo-dim);
+}
+
+.listing-side button.secondary {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+}
+
+.listing-side button.secondary:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.market-empty {
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+  padding: 50px 20px;
+  line-height: 1.6;
+}
+
+/* --- formulário de anúncio --- */
+
+.listing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+}
+
+.listing-form input,
+.listing-form textarea {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.listing-form input:focus,
+.listing-form textarea:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.kind-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.kind-btn {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.kind-btn.active {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* --- chat --- */
+
+.market-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 14px;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.chat-who {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+}
+
+.danger-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.chat-pair-note {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  text-align: center;
+  margin: 10px 0 0 0;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 4px;
+  min-height: 0;
+}
+
+.msg {
+  max-width: 68%;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.msg.mine {
+  align-self: flex-end;
+  background: var(--indigo);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.theirs {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.msg-time {
+  display: block;
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+.chat-transaction {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.chat-transaction.done {
+  border-color: var(--green);
+  color: #7bd69a;
+}
+
+.chat-transaction button {
+  background: var(--green);
+  border: none;
+  color: #06230f;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-transaction button:disabled {
+  background: var(--surface-3);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  flex-shrink: 0;
+}
+
+.chat-form input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  font-size: 13px;
+}
+
+.chat-form input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+/* ---------- Caixa de denúncia no chat ---------- */
+
+.report-box {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.report-box.hidden {
+  display: none;
+}
+
+.report-box textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  font-size: 12.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.report-box textarea:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.report-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.report-actions button[type="submit"] {
+  background: var(--red);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
 }
