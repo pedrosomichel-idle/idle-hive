@@ -1093,9 +1093,7 @@ async function loadListings() {
       <span class="listing-kind ${l.kind}">${l.kind === 'venda' ? 'Vendendo' : 'Comprando'}</span>
       <p class="listing-title">${escapeHtml(l.title)}</p>
       ${l.price_text ? `<p class="listing-price">${escapeHtml(l.price_text)}</p>` : ''}
-      ${l.description ? `<p class="listing-desc">${escapeHtml(l.description)}</p>` : ''}
       <div class="listing-meta">
-        <span>${escapeHtml(l.nickname)}</span>
         <span class="tier-badge ${l.reputation.tier.key}">${l.reputation.tier.label} · ${l.reputation.total}</span>
         ${l.character_name ? `<span>char: ${escapeHtml(l.character_name)}</span>` : ''}
       </div>
@@ -1105,9 +1103,13 @@ async function loadListings() {
     side.className = 'listing-side';
 
     if (l.isMine) {
+      const meTag = document.createElement('span');
+      meTag.className = 'tier-badge';
+      meTag.textContent = 'Seu anúncio';
+      side.appendChild(meTag);
+
       const closeBtn = document.createElement('button');
       closeBtn.type = 'button';
-      closeBtn.className = 'secondary';
       closeBtn.textContent = 'Encerrar';
       closeBtn.addEventListener('click', async () => {
         await window.idleHive.marketUpdateListing(l.id, 'concluido');
@@ -1115,10 +1117,13 @@ async function loadListings() {
       });
       side.appendChild(closeBtn);
     } else {
-      const talkBtn = document.createElement('button');
-      talkBtn.type = 'button';
-      talkBtn.textContent = 'Negociar';
-      talkBtn.addEventListener('click', async () => {
+      // O nick é o convite pra negociar — clicar nele já abre a conversa
+      // privada direto, sem precisar de um botão "Negociar" separado.
+      const nickBtn = document.createElement('button');
+      nickBtn.type = 'button';
+      nickBtn.className = 'listing-nick-btn';
+      nickBtn.textContent = l.nickname;
+      nickBtn.addEventListener('click', async () => {
         const res = await window.idleHive.marketOpenConversation(l.id);
         if (!res.ok) {
           listingsList.insertAdjacentHTML('afterbegin', `<p class="market-empty">${escapeHtml(res.error)}</p>`);
@@ -1126,7 +1131,7 @@ async function loadListings() {
         }
         openChat(res.data.conversationId);
       });
-      side.appendChild(talkBtn);
+      side.appendChild(nickBtn);
     }
 
     card.appendChild(main);
@@ -1209,9 +1214,9 @@ async function loadConversations() {
     card.innerHTML = `
       <div class="listing-main">
         <p class="listing-title">${escapeHtml(c.other.nickname)}</p>
-        ${c.listingTitle ? `<p class="listing-desc">${escapeHtml(c.listingTitle)}</p>` : ''}
         <div class="listing-meta">
           <span class="tier-badge ${c.other.reputation.tier.key}">${c.other.reputation.tier.label} · ${c.other.reputation.total}</span>
+          ${c.listingTitle ? `<span>${escapeHtml(c.listingTitle)}</span>` : ''}
         </div>
       </div>
     `;
