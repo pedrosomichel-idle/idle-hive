@@ -29,7 +29,7 @@
 
 'use strict';
 
-const { app, BrowserWindow, BrowserView, ipcMain, session, shell, Menu, dialog } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, session, shell, Menu, dialog, net } = require('electron');
 const path = require('path');
 const os = require('os');
 const { createClient } = require('@supabase/supabase-js');
@@ -56,6 +56,14 @@ const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
   // mesmo sem usarmos realtime de verdade — passamos o pacote "ws" como
   // implementação pra evitar o erro "native WebSocket not found".
   realtime: { transport: WebSocket },
+  // O fetch nativo do Node usa sua PRÓPRIA lista de certificados,
+  // separada da que o Windows/navegador usa. Em PCs com antivírus ou
+  // proxy corporativo que inspeciona HTTPS (comum em rede de empresa),
+  // isso causa "fetch failed" mesmo com internet normal — o navegador
+  // confia no certificado do antivírus, o Node não. net.fetch usa o
+  // motor de rede do próprio Electron (Chromium), que confia na mesma
+  // lista de certificados do sistema, igual um navegador de verdade.
+  global: { fetch: net.fetch },
 });
 
 // windowId -> ctx (uma entrada por janela aberta)
@@ -274,7 +282,7 @@ async function fetchLicenseStatus(accessToken, deviceId) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(`${config.BACKEND_URL}/api/license/status`, {
+    const res = await net.fetch(`${config.BACKEND_URL}/api/license/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ deviceId }),
@@ -299,7 +307,7 @@ async function activateDevice(accessToken, deviceId, deviceName) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(`${config.BACKEND_URL}/api/license/activate`, {
+    const res = await net.fetch(`${config.BACKEND_URL}/api/license/activate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ deviceId, deviceName }),
@@ -440,7 +448,7 @@ function registerAuthIpcHandlers() {
     if (!storedSession) return { ok: false, error: 'Não autenticado' };
 
     try {
-      const res = await fetch(`${config.BACKEND_URL}/api/checkout`, {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -462,7 +470,7 @@ function registerAuthIpcHandlers() {
     if (!storedSession) return { ok: false, error: 'Não autenticado' };
 
     try {
-      const res = await fetch(`${config.BACKEND_URL}/api/checkout`, {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -485,7 +493,7 @@ function registerAuthIpcHandlers() {
     if (!storedSession) return { ok: false, error: 'Não autenticado' };
 
     try {
-      const res = await fetch(`${config.BACKEND_URL}/api/license/redeem-key`, {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/license/redeem-key`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -523,7 +531,7 @@ function registerAuthIpcHandlers() {
     if (!storedSession) return { ok: false, error: 'Não autenticado' };
 
     try {
-      const res = await fetch(`${config.BACKEND_URL}/api/affiliate/me`, {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/affiliate/me`, {
         headers: { Authorization: `Bearer ${storedSession.access_token}` },
       });
       const json = await res.json().catch(() => ({}));
@@ -540,7 +548,7 @@ function registerAuthIpcHandlers() {
     if (!storedSession) return { ok: false, error: 'Não autenticado' };
 
     try {
-      const res = await fetch(`${config.BACKEND_URL}/api/affiliate/join`, {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/affiliate/join`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${storedSession.access_token}` },
       });
@@ -779,10 +787,15 @@ function applyViewGeometry(ctx, id, view, headerRect, contentRect) {
 // usuário removê-la — por isso, ao reabrir o app, todas as "abas" que
 // estavam abertas voltam automaticamente na grade, sem precisar de nada
 // extra.
+// Mantém um BrowserView vivo pra CADA conta cadastrada, de todas as
+// categorias — não só da categoria ativa. É isso que faz os jogos das
+// outras categorias continuarem rodando (e acumulando) em segundo
+// plano. Quem decide o que aparece na tela é o layoutViews, que anexa
+// só os painéis da categoria ativa.
 function syncViewsWithAccounts(ctx) {
   if (!ctx || !ctx.accountsStore) return;
-  const accounts = ctx.accountsStore.list();
-  const currentIds = new Set(accounts.map((a) => a.id));
+  const allAccounts = ctx.accountsStore.listAll();
+  const currentIds = new Set(allAccounts.map((a) => a.id));
 
   for (const id of Array.from(ctx.views.keys())) {
     if (!currentIds.has(id)) {
@@ -791,7 +804,7 @@ function syncViewsWithAccounts(ctx) {
     }
   }
 
-  accounts.forEach((account) => {
+  allAccounts.forEach((account) => {
     if (!ctx.views.has(account.id)) {
       createViewForAccount(ctx, account);
     }
@@ -803,7 +816,11 @@ function syncViewsWithAccounts(ctx) {
 function broadcastState(ctx, precomputedMetrics) {
   if (!ctx || !ctx.window || ctx.window.isDestroyed() || ctx.currentUiView !== 'app') return;
 
-  const accounts = ctx.accountsStore.list();
+  // TODAS as contas, de todas as categorias — a sidebar agora lista as
+  // categorias inteiras (com as abas de cada uma), não só a ativa. Os
+  // headers desenhados sobre a grade continuam sendo só os da categoria
+  // ativa, porque só esses têm retângulo em panelRects.
+  const accounts = ctx.accountsStore.listAll();
   // getAppMetrics() lê TODOS os processos do Electron (não só desta
   // janela) — quando o timer de métricas já leu isso pra todas as
   // janelas neste tick, ele passa o resultado pronto aqui em vez da
@@ -827,6 +844,7 @@ function broadcastState(ctx, precomputedMetrics) {
 
     return {
       id: account.id,
+      categoryId: account.categoryId,
       name: account.name,
       url: account.url,
       muted: !!account.muted,
@@ -848,10 +866,89 @@ function broadcastState(ctx, precomputedMetrics) {
     accounts: accountsPayload,
     focusedId: ctx.focusedId,
     headers,
+    categories: ctx.accountsStore.listCategories(),
+    activeCategoryId: ctx.accountsStore.getActiveCategoryId(),
   });
 }
 
 function registerAccountsIpcHandlers() {
+  // ---------------------------------------------------------------------
+  // Categorias (workspaces)
+  // ---------------------------------------------------------------------
+
+  ipcMain.handle('categories:add', (event, name) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return null;
+    const category = ctx.accountsStore.addCategory(name);
+    // A categoria nova nasce vazia e já vira a ativa — os painéis das
+    // outras continuam vivos, só saem da tela.
+    ctx.focusedId = null;
+    layoutViews(ctx);
+    return category;
+  });
+
+  ipcMain.handle('categories:switch', (event, id) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return null;
+    const switched = ctx.accountsStore.setActiveCategory(id);
+    if (!switched) return null;
+    ctx.focusedId = null;
+    layoutViews(ctx);
+    return switched;
+  });
+
+  ipcMain.handle('categories:rename', (event, { id, name }) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return null;
+    const category = ctx.accountsStore.renameCategory(id, name);
+    broadcastState(ctx);
+    return category;
+  });
+
+  ipcMain.handle('categories:remove', (event, id) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return false;
+
+    const category = ctx.accountsStore.listCategories().find((c) => c.id === id);
+    if (!category) return false;
+
+    const accountCount = ctx.accountsStore.accountIdsInCategory(id).length;
+    const response = dialog.showMessageBoxSync(ctx.window, {
+      type: 'warning',
+      buttons: ['Cancelar', 'Remover'],
+      defaultId: 0,
+      cancelId: 0,
+      message: `Remover a categoria "${category.name}"?`,
+      detail:
+        accountCount > 0
+          ? `As ${accountCount} aba(s) dentro dela também serão removidas. Os dados de login continuam salvos.`
+          : 'Essa categoria está vazia.',
+    });
+    if (response !== 1) return false;
+
+    const removed = ctx.accountsStore.removeCategory(id);
+    if (removed) {
+      // syncViewsWithAccounts destrói os BrowserViews órfãos (as contas
+      // que estavam nessa categoria) e redesenha a grade da categoria
+      // que passou a ser a ativa.
+      ctx.focusedId = null;
+      syncViewsWithAccounts(ctx);
+    }
+    return removed;
+  });
+
+  ipcMain.handle('accounts:moveToCategory', (event, { id, categoryId }) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return null;
+    const account = ctx.accountsStore.moveToCategory(id, categoryId);
+    if (account) layoutViews(ctx);
+    return account;
+  });
+
+  // ---------------------------------------------------------------------
+  // Contas
+  // ---------------------------------------------------------------------
+
   ipcMain.handle('accounts:add', (event, { name, url }) => {
     const ctx = getCtx(event);
     if (!ctx || !ctx.accountsStore) return null;
@@ -942,6 +1039,23 @@ function registerAccountsIpcHandlers() {
           ctx.accountsStore.setFavorite(id, !account.favorite);
           broadcastState(ctx);
         },
+      },
+      {
+        label: 'Mover para categoria',
+        // Só faz sentido mostrar as OUTRAS categorias — mover pra onde
+        // a aba já está não faria nada.
+        submenu: ctx.accountsStore
+          .listCategories()
+          .filter((c) => c.id !== account.categoryId)
+          .map((c) => ({
+            label: c.name,
+            click: () => {
+              ctx.accountsStore.moveToCategory(id, c.id);
+              if (ctx.focusedId === id) ctx.focusedId = null;
+              layoutViews(ctx);
+            },
+          })),
+        enabled: ctx.accountsStore.listCategories().length > 1,
       },
       { type: 'separator' },
       {

@@ -281,14 +281,16 @@ document.getElementById('add-account-window-btn').addEventListener('click', () =
 // App principal (grade de painéis)
 // ---------------------------------------------------------------------
 
-const toggleAddBtn = document.getElementById('toggle-add');
 const backToGridBtn = document.getElementById('back-to-grid');
 const logoutBtn = document.getElementById('logout-btn');
 const form = document.getElementById('add-form');
 const nameInput = document.getElementById('account-name');
 const urlInput = document.getElementById('account-url');
-const list = document.getElementById('account-list');
-const emptyHint = document.getElementById('empty-hint');
+const addFormCategoryLabel = document.getElementById('add-form-category');
+const addFormCancel = document.getElementById('add-form-cancel');
+const categoryListEl = document.getElementById('category-list');
+const newCategoryForm = document.getElementById('new-category-form');
+const newCategoryInput = document.getElementById('new-category-name');
 const headersLayer = document.getElementById('headers-layer');
 
 const STATUS_LABEL = {
@@ -297,28 +299,52 @@ const STATUS_LABEL = {
   loading: 'Carregando',
 };
 
-let latestState = { accounts: [], headers: [], focusedId: null };
+let latestState = { accounts: [], headers: [], focusedId: null, categories: [], activeCategoryId: null };
 // id da conta em edição inline de nome no momento (null = nenhuma).
 let renamingId = null;
+// id da categoria em edição inline de nome no momento (null = nenhuma).
+let renamingCategoryId = null;
+// Categorias recolhidas na sidebar — só estado visual, não persiste.
+const collapsedCategories = new Set();
 
 function statusLabel(status) {
   return STATUS_LABEL[status] || status;
 }
 
-function render(state) {
+function render(state, force) {
   latestState = state;
+  backToGridBtn.disabled = !state.focusedId;
+
+  // As métricas chegam a cada 2s e redesenham a sidebar inteira. Se
+  // houver um campo de renomear aberto (conta OU categoria), redesenhar
+  // destruiria o input no meio da digitação (perdendo o texto e o
+  // cursor) — então o redesenho espera a edição terminar.
+  if ((renamingId !== null || renamingCategoryId !== null) && !force) {
+    return;
+  }
+
   // Se a conta em edição está visível como painel na grade, é lá que o
   // campo de edição aparece (evita dois <input> disputando foco ao
   // mesmo tempo — um roubava o foco do outro e fechava a edição sozinho).
   const renamingHasHeader = renamingId !== null && state.headers.some((h) => h.id === renamingId);
   renderSidebar(state, renamingHasHeader);
   renderHeaders(state);
-  backToGridBtn.disabled = !state.focusedId;
 }
+
+
 
 function startRename(id) {
   renamingId = id;
-  render(latestState);
+  // force:true é obrigatório aqui — sem isso, o próprio guard "não
+  // redesenha durante edição" (que acabamos de setar renamingId pra
+  // acionar) bloquearia este redesenho, e o campo de edição nunca
+  // apareceria.
+  render(latestState, true);
+}
+
+function cancelRename() {
+  renamingId = null;
+  render(latestState, true);
 }
 
 async function commitRename(id, input) {
@@ -326,12 +352,32 @@ async function commitRename(id, input) {
   renamingId = null;
   if (newName) {
     await window.idleHive.renameAccount(id, newName);
-  } else {
-    render(latestState);
   }
+  // Redesenha já — o render normal das métricas pode demorar até 2s, e
+  // até lá o campo de edição ficaria na tela sem motivo.
+  render(latestState, true);
 }
 
-function buildRenameInput(id, currentName, onDone) {
+function startCategoryRename(id) {
+  renamingCategoryId = id;
+  render(latestState, true);
+}
+
+function cancelCategoryRename() {
+  renamingCategoryId = null;
+  render(latestState, true);
+}
+
+async function commitCategoryRename(id, input) {
+  const newName = input.value.trim();
+  renamingCategoryId = null;
+  if (newName) {
+    await window.idleHive.renameCategory(id, newName);
+  }
+  render(latestState, true);
+}
+
+function buildRenameInput(id, currentName, onDone, onCancel) {
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'rename-input';
@@ -347,8 +393,8 @@ function buildRenameInput(id, currentName, onDone) {
     if (event.key === 'Enter') {
       input.blur();
     } else if (event.key === 'Escape') {
-      renamingId = null;
-      render(latestState);
+      input.removeEventListener('blur', finish);
+      onCancel();
     }
   });
   input.addEventListener('click', (event) => event.stopPropagation());
@@ -362,76 +408,210 @@ function buildRenameInput(id, currentName, onDone) {
   return input;
 }
 
-function renderSidebar(state, renamingHasHeader) {
-  list.innerHTML = '';
+// Monta o item de uma aba (usado dentro de cada categoria).
+function buildAccountItem(account, state, renamingHasHeader) {
+  const isActiveCategory = account.categoryId === state.activeCategoryId;
 
-  if (state.accounts.length === 0) {
-    emptyHint.style.display = 'flex';
-    return;
+  const item = document.createElement('li');
+  item.className =
+    'account-item' +
+    (state.focusedId === account.id ? ' focused' : '') +
+    (isActiveCategory ? '' : ' background');
+
+  const rowTop = document.createElement('div');
+  rowTop.className = 'row-top';
+
+  const nameGroup = document.createElement('div');
+  nameGroup.className = 'name-group';
+
+  const dot = document.createElement('span');
+  dot.className = `status-dot ${account.status}`;
+  nameGroup.appendChild(dot);
+
+  if (account.favorite) {
+    const star = document.createElement('span');
+    star.className = 'favorite-star';
+    star.textContent = '★';
+    nameGroup.appendChild(star);
   }
-  emptyHint.style.display = 'none';
 
-  state.accounts.forEach((account) => {
-    const item = document.createElement('li');
-    item.className = 'account-item' + (state.focusedId === account.id ? ' focused' : '');
+  if (renamingId === account.id && !renamingHasHeader) {
+    const input = buildRenameInput(account.id, account.name, (el) => commitRename(account.id, el), cancelRename);
+    nameGroup.appendChild(input);
+  } else {
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = account.name;
+    name.title = account.url;
+    name.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      startRename(account.id);
+    });
+    nameGroup.appendChild(name);
+  }
 
-    const rowTop = document.createElement('div');
-    rowTop.className = 'row-top';
+  const statusText = document.createElement('span');
+  statusText.className = 'status-label';
+  statusText.textContent = statusLabel(account.status);
 
-    const nameGroup = document.createElement('div');
-    nameGroup.className = 'name-group';
+  rowTop.appendChild(nameGroup);
+  rowTop.appendChild(statusText);
 
-    const dot = document.createElement('span');
-    dot.className = `status-dot ${account.status}`;
-    nameGroup.appendChild(dot);
+  const rowBottom = document.createElement('div');
+  rowBottom.className = 'row-bottom';
+  rowBottom.innerHTML = `<span>CPU ${account.cpu}%</span><span>RAM ${account.ramMB} MB</span>`;
 
-    if (account.favorite) {
-      const star = document.createElement('span');
-      star.className = 'favorite-star';
-      star.textContent = '★';
-      nameGroup.appendChild(star);
+  item.appendChild(rowTop);
+  item.appendChild(rowBottom);
+
+  item.addEventListener('click', () => {
+    if (renamingId === account.id) return;
+    // Aba de uma categoria que não está na grade: o clique traz essa
+    // categoria pra tela em vez de expandir um painel que não aparece.
+    if (!isActiveCategory) {
+      window.idleHive.switchCategory(account.categoryId);
+      return;
     }
+    window.idleHive.toggleExpand(account.id);
+  });
 
-    if (renamingId === account.id && !renamingHasHeader) {
-      const input = buildRenameInput(account.id, account.name, (el) => commitRename(account.id, el));
-      nameGroup.appendChild(input);
+  item.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    window.idleHive.showContextMenu(account.id);
+  });
+
+  return item;
+}
+
+// Sidebar em formato de lista/acordeão: cada categoria é uma seção fixa
+// com suas abas embaixo, que podem ser recolhidas clicando no cabeçalho.
+function renderSidebar(state, renamingHasHeader) {
+  categoryListEl.innerHTML = '';
+
+  const categories = state.categories || [];
+  const accounts = state.accounts || [];
+
+  categories.forEach((category) => {
+    const isActive = category.id === state.activeCategoryId;
+    const isCollapsed = collapsedCategories.has(category.id);
+
+    const section = document.createElement('div');
+    section.className =
+      'category-section' + (isActive ? ' active' : '') + (isCollapsed ? ' collapsed' : '');
+
+    // --- cabeçalho ---
+    const header = document.createElement('div');
+    header.className = 'category-header';
+
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.textContent = '▾';
+
+    const catName = document.createElement('span');
+    catName.className = 'cat-name';
+
+    if (renamingCategoryId === category.id) {
+      const input = buildRenameInput(category.id, category.name, (el) => commitCategoryRename(category.id, el), cancelCategoryRename);
+      catName.appendChild(input);
     } else {
-      const name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = account.name;
-      name.title = account.url;
-      name.addEventListener('dblclick', (event) => {
+      catName.textContent = category.name;
+      catName.addEventListener('dblclick', (event) => {
         event.stopPropagation();
-        startRename(account.id);
+        startCategoryRename(category.id);
       });
-      nameGroup.appendChild(name);
     }
 
-    const statusText = document.createElement('span');
-    statusText.className = 'status-label';
-    statusText.textContent = statusLabel(account.status);
+    const catAccounts = accounts.filter((a) => a.categoryId === category.id);
 
-    rowTop.appendChild(nameGroup);
-    rowTop.appendChild(statusText);
+    const count = document.createElement('span');
+    count.className = 'cat-count';
+    count.textContent = String(catAccounts.length);
 
-    const rowBottom = document.createElement('div');
-    rowBottom.className = 'row-bottom';
-    rowBottom.innerHTML = `<span>CPU ${account.cpu}%</span><span>RAM ${account.ramMB} MB</span>`;
+    const actions = document.createElement('div');
+    actions.className = 'category-actions';
 
-    item.appendChild(rowTop);
-    item.appendChild(rowBottom);
-
-    item.addEventListener('click', () => {
-      if (renamingId === account.id) return;
-      window.idleHive.toggleExpand(account.id);
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.title = 'Adicionar aba nesta categoria';
+    addBtn.textContent = '+';
+    addBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      // A aba nova sempre entra na categoria ativa, então traz essa
+      // categoria pra frente antes de abrir o formulário.
+      if (!isActive) await window.idleHive.switchCategory(category.id);
+      collapsedCategories.delete(category.id);
+      openAddForm(category.name);
     });
 
-    item.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      window.idleHive.showContextMenu(account.id);
+    const renameBtn = document.createElement('button');
+    renameBtn.type = 'button';
+    renameBtn.title = 'Renomear categoria';
+    renameBtn.textContent = '✎';
+    renameBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      startCategoryRename(category.id);
     });
 
-    list.appendChild(item);
+    actions.appendChild(addBtn);
+    actions.appendChild(renameBtn);
+
+    // A última categoria não pode ser removida — o app ficaria sem tela.
+    if (categories.length > 1) {
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'danger';
+      removeBtn.title = 'Remover categoria';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        window.idleHive.removeCategory(category.id);
+      });
+      actions.appendChild(removeBtn);
+    }
+
+    header.appendChild(caret);
+    header.appendChild(catName);
+    header.appendChild(count);
+    header.appendChild(actions);
+
+    header.addEventListener('click', () => {
+      if (!isActive) {
+        // Categoria em segundo plano: primeiro clique traz ela pra grade
+        // (e garante que fique aberta pra ver as abas).
+        collapsedCategories.delete(category.id);
+        window.idleHive.switchCategory(category.id);
+        return;
+      }
+      // Já é a categoria da grade: alterna recolher/expandir a lista.
+      if (isCollapsed) collapsedCategories.delete(category.id);
+      else collapsedCategories.add(category.id);
+      render(latestState, true);
+    });
+
+    section.appendChild(header);
+
+    // --- abas da categoria ---
+    if (catAccounts.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'category-empty';
+      empty.textContent = 'Nenhuma aba aqui ainda.';
+      section.appendChild(empty);
+    } else {
+      const ul = document.createElement('ul');
+      ul.className = 'category-accounts';
+      catAccounts
+        .slice()
+        .sort((a, b) => {
+          if (!!b.favorite !== !!a.favorite) return b.favorite ? 1 : -1;
+          return 0;
+        })
+        .forEach((account) => {
+          ul.appendChild(buildAccountItem(account, state, renamingHasHeader));
+        });
+      section.appendChild(ul);
+    }
+
+    categoryListEl.appendChild(section);
   });
 }
 
@@ -462,7 +642,7 @@ function renderHeaders(state) {
     titleGroup.appendChild(dot);
 
     if (renamingId === header.id) {
-      const input = buildRenameInput(header.id, header.name, (el2) => commitRename(header.id, el2));
+      const input = buildRenameInput(header.id, header.name, (el2) => commitRename(header.id, el2), cancelRename);
       titleGroup.appendChild(input);
     } else {
       const titleText = document.createElement('span');
@@ -569,12 +749,21 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
-toggleAddBtn.addEventListener('click', () => {
-  form.classList.toggle('hidden');
-  if (!form.classList.contains('hidden')) {
-    nameInput.focus();
-  }
-});
+// Abre o formulário de nova aba, mostrando em qual categoria ela vai
+// entrar (o "+" de cada categoria já deixou ela ativa antes de chamar).
+function openAddForm(categoryName) {
+  addFormCategoryLabel.textContent = categoryName;
+  form.classList.remove('hidden');
+  nameInput.focus();
+}
+
+function closeAddForm() {
+  form.classList.add('hidden');
+  nameInput.value = '';
+  urlInput.value = '';
+}
+
+addFormCancel.addEventListener('click', closeAddForm);
 
 backToGridBtn.addEventListener('click', () => {
   if (latestState.focusedId) {
@@ -698,9 +887,19 @@ form.addEventListener('submit', async (event) => {
   if (!url) return;
 
   await window.idleHive.addAccount(name, url);
-  nameInput.value = '';
-  urlInput.value = '';
-  form.classList.add('hidden');
+  closeAddForm();
+});
+
+// --- Criar categoria nova ---
+newCategoryForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = newCategoryInput.value.trim();
+  if (!name) return;
+  await window.idleHive.addCategory(name);
+  newCategoryInput.value = '';
+  // A categoria nova nasce vazia e já ativa — abre o formulário direto
+  // pra ela, que é o passo seguinte natural do fluxo.
+  openAddForm(name);
 });
 
 window.idleHive.onStateUpdate(render);

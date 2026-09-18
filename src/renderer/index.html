@@ -134,30 +134,62 @@
     <section id="view-app" class="view hidden">
       <aside class="sidebar">
         <div class="sidebar-top">
-          <span class="workspace-name">Principal</span>
+          <span class="workspace-name">IdleHive</span>
           <div class="top-icons">
-            <button type="button" id="toggle-add" class="icon-btn" title="Adicionar conta">✎</button>
-            <button type="button" id="back-to-grid" class="icon-btn" title="Ver todas" disabled>⬚</button>
-            <button type="button" id="affiliate-btn" class="icon-btn" title="Programa de afiliados">◆</button>
-            <button type="button" id="account-btn" class="icon-btn" title="Conta e licença">🔑</button>
-            <button type="button" id="logout-btn" class="icon-btn" title="Sair da conta">⏻</button>
+            <button type="button" id="back-to-grid" class="icon-btn" title="Ver todas" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
+                <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
+                <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
+                <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+              </svg>
+            </button>
+            <button type="button" id="affiliate-btn" class="icon-btn" title="Programa de afiliados">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="6" cy="12" r="2.6" />
+                <circle cx="18" cy="5.5" r="2.6" />
+                <circle cx="18" cy="18.5" r="2.6" />
+                <line x1="8.3" y1="10.7" x2="15.7" y2="6.9" />
+                <line x1="8.3" y1="13.3" x2="15.7" y2="17.1" />
+              </svg>
+            </button>
+            <button type="button" id="account-btn" class="icon-btn" title="Conta e licença">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="8" cy="15" r="4" />
+                <line x1="11" y1="12" x2="20" y2="3" />
+                <line x1="16.3" y1="6.7" x2="19.2" y2="9.6" />
+                <line x1="13.4" y1="9.6" x2="15.7" y2="11.9" />
+              </svg>
+            </button>
+            <button type="button" id="logout-btn" class="icon-btn" title="Sair da conta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.5" />
+                <polyline points="15.5 16.5 20 12 15.5 7.5" />
+                <line x1="20" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
           </div>
         </div>
 
+        <!-- Lista de categorias (cada uma com suas abas, recolhível) -->
+        <div id="category-list" class="category-list"></div>
+
+        <!-- Formulário de nova aba: fica fora da lista pra não perder o
+             foco quando a sidebar se redesenha (métricas a cada 2s) -->
         <form id="add-form" class="add-form hidden">
+          <p class="add-form-target">Nova aba em <strong id="add-form-category">—</strong></p>
           <input type="text" id="account-name" placeholder="Nome da conta" required />
           <input type="text" id="account-url" placeholder="URL do jogo (ex: exemplo.com)" required />
-          <button type="submit">+ Adicionar conta</button>
+          <div class="add-form-actions">
+            <button type="button" id="add-form-cancel" class="ghost-btn">Cancelar</button>
+            <button type="submit">Adicionar</button>
+          </div>
         </form>
 
-        <ul id="account-list" class="account-list"></ul>
-
-        <p class="empty-hint" id="empty-hint">
-          <svg width="28" height="32" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="14,1 27,8 27,24 14,31 1,24 1,8" stroke="#565d68" stroke-width="1.5"/>
-          </svg>
-          Nenhuma conta ainda.<br />Clique no ✎ acima para adicionar.
-        </p>
+        <form id="new-category-form" class="new-category-form">
+          <input type="text" id="new-category-name" placeholder="+ Nova categoria" autocomplete="off" />
+          <button type="submit" title="Criar categoria">+</button>
+        </form>
 
         <div id="update-banner" class="update-banner hidden">
           <span>Atualização pronta.</span>

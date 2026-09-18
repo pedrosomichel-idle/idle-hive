@@ -329,7 +329,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 14px;
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 1;
 }
 
@@ -379,6 +379,12 @@ body {
   font-size: 12px;
   cursor: pointer;
   padding: 0;
+}
+
+.icon-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .icon-btn:hover:not(:disabled) {
@@ -973,4 +979,214 @@ body {
 #affiliate-active-view.hidden,
 #affiliate-join-view.hidden {
   display: none;
+}
+
+/* ---------- Lista de categorias (acordeão) ---------- */
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.category-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+}
+
+.category-header:hover {
+  border-color: var(--border-soft);
+}
+
+/* A categoria ativa é a que a grade está exibindo — destaque no indigo */
+.category-section.active .category-header {
+  background: var(--surface-3);
+  border-left-color: var(--indigo);
+}
+
+.category-header .caret {
+  font-size: 9px;
+  color: var(--text-faint);
+  width: 9px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.category-section.collapsed .category-header .caret {
+  transform: rotate(-90deg);
+}
+
+.category-header .cat-name {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-header .cat-count {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.category-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.category-actions button {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  line-height: 1;
+  visibility: hidden;
+}
+
+.category-header:hover .category-actions button {
+  visibility: visible;
+}
+
+.category-actions button:hover {
+  color: #fff;
+  background: var(--border-soft);
+}
+
+.category-actions button.danger:hover {
+  color: var(--red);
+  background: transparent;
+}
+
+.category-accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.category-section.collapsed .category-accounts {
+  display: none;
+}
+
+.category-empty {
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 4px 10px 2px 18px;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Abas de categorias em segundo plano: visíveis, mas discretas —
+   continuam rodando, só não estão na grade agora. */
+.account-item.background {
+  opacity: 0.55;
+}
+
+.account-item.background:hover {
+  opacity: 1;
+}
+
+/* ---------- Formulário de nova aba ---------- */
+
+.add-form-target {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0 0 2px 0;
+}
+
+.add-form-target strong {
+  color: var(--indigo-bright);
+}
+
+.add-form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.add-form-actions button[type="submit"] {
+  flex: 1;
+  margin-top: 0;
+}
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.ghost-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* ---------- Criar categoria ---------- */
+
+.new-category-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.new-category-form input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.new-category-form input:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.new-category-form button {
+  background: var(--indigo);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  width: 32px;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.new-category-form button:hover {
+  background: var(--indigo-dim);
 }

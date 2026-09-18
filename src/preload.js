@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('idleHive', {
 
   // Contas / painéis
   addAccount: (name, url) => ipcRenderer.invoke('accounts:add', { name, url }),
+  addCategory: (name) => ipcRenderer.invoke('categories:add', name),
+  switchCategory: (id) => ipcRenderer.invoke('categories:switch', id),
+  renameCategory: (id, name) => ipcRenderer.invoke('categories:rename', { id, name }),
+  removeCategory: (id) => ipcRenderer.invoke('categories:remove', id),
+  moveAccountToCategory: (id, categoryId) => ipcRenderer.invoke('accounts:moveToCategory', { id, categoryId }),
   removeAccount: (id) => ipcRenderer.invoke('accounts:remove', id),
   reloadAccount: (id) => ipcRenderer.invoke('accounts:reload', id),
   toggleMute: (id) => ipcRenderer.invoke('accounts:toggleMute', id),

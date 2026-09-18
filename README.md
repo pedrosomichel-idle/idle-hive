@@ -181,6 +181,50 @@ o app normalmente (comportamento padrão do `electron-updater`).
   `config.js`, que não vai pro repositório se você adicionar ele no
   `.gitignore`).
 
+## Categorias (workspaces)
+
+A sidebar é uma lista de categorias fixas — cada categoria é uma "tela"
+independente com suas próprias abas embaixo, em formato de acordeão.
+Serve pra separar jogos/projetos diferentes sem misturar tudo numa
+grade só.
+
+- **Criar**: campo "+ Nova categoria" no rodapé da sidebar. Ela nasce
+  vazia, já vira a ativa, e o formulário de nova aba abre em seguida.
+- **Adicionar aba**: botão `+` no cabeçalho da categoria.
+- **Renomear**: botão `✎` no cabeçalho, ou duplo clique no nome — abre um campo de edição inline (não usa `window.prompt()`, que o Electron não implementa e não mostra nada).
+- **Remover**: botão `✕` (pede confirmação e avisa quantas abas serão
+  removidas junto). A última categoria não pode ser removida — o app
+  nunca fica sem nenhuma tela.
+- **Recolher/expandir**: clicar no cabeçalho da categoria ativa recolhe
+  a lista de abas dela. Clicar no cabeçalho de outra categoria traz ela
+  pra grade.
+- **Mover uma aba entre categorias**: botão direito na aba → "Mover
+  para categoria".
+
+**Todas as categorias ficam visíveis ao mesmo tempo na sidebar**, e as
+abas das categorias que não estão na grade aparecem mais discretas
+(esmaecidas) — continuam rodando, só não estão sendo exibidas. Clicar
+numa dessas abas traz a categoria dela pra grade.
+
+**As abas das outras categorias continuam rodando** enquanto você está
+noutra tela — os `BrowserView` de todas as categorias ficam vivos, só
+os da categoria ativa é que ficam anexados à janela (mesmo mecanismo
+da otimização de "painéis fora de foco"). Ou seja, os jogos continuam
+acumulando em segundo plano, só param de gastar GPU desenhando. O
+CPU/RAM de cada aba continua visível mesmo em segundo plano.
+
+Em disco isso vira `accounts-<userId>.json` com `categories`,
+`accounts` (cada uma com seu `categoryId`) e `activeCategoryId`.
+Arquivos gravados pela versão anterior (array puro de contas, sem
+categorias) são **migrados automaticamente** na primeira leitura: todas
+as abas existentes vão pra uma categoria "Principal", sem perder nada.
+
+**Detalhe de implementação**: a sidebar se redesenha a cada 2s (ciclo
+das métricas de CPU/RAM). Enquanto um campo de renomear está aberto, o
+redesenho é suspenso — sem isso, o input seria destruído no meio da
+digitação, perdendo o texto e o cursor. O formulário de nova aba fica
+fora da área redesenhada pelo mesmo motivo.
+
 ## Otimizações de performance
 
 - **Painéis fora de tela não pesam à toa**: quando você usa "Expandir"
@@ -221,6 +265,21 @@ escuta `did-stop-loading` (que o Chromium sempre dispara quando a
 página para de carregar, com sucesso ou não) como uma segunda
 confirmação — se ainda estava "loading" nesse momento e não virou
 "erro" antes, considera online.
+
+## "fetch failed" em PCs com antivírus/proxy corporativo
+
+O Node.js (usado internamente pelo processo principal do Electron) faz
+requisições de rede com sua **própria lista de certificados**,
+separada da que o Windows/navegador usa. Em PCs com antivírus que
+inspeciona HTTPS (comum em notebook de empresa, ou alguns antivírus
+residenciais mais agressivos), o navegador confia no certificado
+substituído por esse software — mas o Node não, e a conexão falha
+silenciosamente com "fetch failed", mesmo com internet normal.
+
+Corrigido: todas as chamadas de rede do app (Supabase Auth e o backend
+de licenciamento) agora usam `net.fetch` do próprio Electron, que
+roda sobre o mesmo motor do Chromium — e por isso confia na mesma
+lista de certificados que um navegador normal confiaria.
 
 ## Sessão expirada vs. sem licença
 
