@@ -327,6 +327,22 @@ nenhuma licença — mostra o botão, com o rótulo mudando pra "Renovar
 licença" quando já existe alguma licença (mesmo vencendo) e "Comprar
 licença" só quando não existe nenhuma ainda.
 
+## Stripe desativado — só PIX (por enquanto, pra testes)
+
+Os botões de cartão (Stripe) — "Comprar licença", "Comprar slot extra"
+na tela de licença e no modal de conta — ficam escondidos
+(`class="hidden"` fixo no HTML), sem que nenhum código JS mexa nessa
+classe deles mais. **Não apaguei o código do Stripe** — os handlers,
+o IPC, tudo continua funcionando por trás; é só a interface que não
+mostra mais esses botões. Reativar depois é só remover o `hidden` do
+HTML e devolver as linhas de `.classList.toggle(...)` no
+`renderer.js` (estão comentadas explicando exatamente isso).
+
+O botão de PIX virou o principal: cor sólida característica (gradiente
+teal), ícone inspirado no símbolo do PIX, brilho, e uma legenda abaixo
+("Aprovação na hora, sem esperar boleto compensar") reforçando a
+vantagem.
+
 ## PIX/boleto via Mercado Pago — segunda forma de pagamento
 
 Adicionado como opção **ao lado** do Stripe (cartão), não no lugar —

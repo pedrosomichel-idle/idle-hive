@@ -209,9 +209,11 @@ window.idleHive.onSetView(({ view, data }) => {
     // Quando o problema é limite de dispositivos, a conta já tem
     // licença válida — comprar OUTRA licença não resolve, o que falta
     // é um slot extra pra este dispositivo específico.
-    buyLicenseBtn.classList.toggle('hidden', isDeviceLimit);
+    // (Stripe desativado por enquanto — só PIX. buyLicenseBtn/
+    // buyDeviceSlotBtn ficam sempre escondidos, controlado só pelo
+    // "hidden" fixo no HTML — não mexemos na classe deles aqui de
+    // propósito, pra não reaparecerem sem querer.)
     buyLicensePixBtn.classList.toggle('hidden', isDeviceLimit);
-    buyDeviceSlotBtn.classList.toggle('hidden', !isDeviceLimit);
     buyDeviceSlotPixBtn.classList.toggle('hidden', !isDeviceLimit);
 
     licenseMessage.textContent =
@@ -249,7 +251,7 @@ let latestLicenseStatus = null;
 
 function formatPlanStatus(status) {
   if (!status) return 'Verificando plano...';
-  if (status.plan === 'standard' && !status.expiresAt) return 'Licença ativa (permanente). ✓';
+  if (status.plan === 'standard' && !status.expiresAt) return 'Licença vitalícia ativa. ✓';
   if (status.plan === 'standard' && status.expiresAt) {
     return `Licença ativa até ${new Date(status.expiresAt).toLocaleString('pt-BR')}.`;
   }
@@ -277,15 +279,22 @@ function renderAccountModal() {
   // estava prestes a vencer — travando quem precisava renovar.
   const isPermanent =
     latestLicenseStatus && latestLicenseStatus.plan === 'standard' && !latestLicenseStatus.expiresAt;
-  accountBuyLicenseBtn.classList.toggle('hidden', !!isPermanent);
+  // Stripe desativado por enquanto — accountBuyLicenseBtn fica sempre
+  // escondido (hidden fixo no HTML), só o botão de PIX é controlado
+  // aqui.
   accountBuyLicensePixBtn.classList.toggle('hidden', !!isPermanent);
 
   // Rótulo do botão acompanha a situação: "Renovar" quando já existe
   // alguma licença (mesmo prestes a vencer) — "Comprar" só quando não
   // existe nenhuma ainda.
   const hasAnyLicense = latestLicenseStatus && (latestLicenseStatus.plan === 'standard' || latestLicenseStatus.plan === 'promo');
-  accountBuyLicenseBtn.textContent = hasAnyLicense ? 'Renovar licença — R$ 20' : 'Comprar licença — R$ 20';
-  accountBuyLicensePixBtn.textContent = hasAnyLicense ? 'Renovar com PIX' : 'Pagar com PIX';
+  // Atualiza só o texto (o <span> dentro do botão) — o botão tem um
+  // ícone (<svg>) antes do texto, então usar .textContent no botão
+  // inteiro apagaria o ícone junto.
+  const accountPixLabel = accountBuyLicensePixBtn.querySelector('span');
+  if (accountPixLabel) {
+    accountPixLabel.textContent = hasAnyLicense ? 'Renovar com PIX — R$ 9,90' : 'Pagar com PIX — R$ 9,90';
+  }
 }
 
 accountBtn.addEventListener('click', () => {
