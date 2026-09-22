@@ -46,11 +46,16 @@ class AccountsStore {
     this.categories = data.categories;
     this.accounts = data.accounts;
     this.activeCategoryId = data.activeCategoryId;
+    // Modo Eco: reduz o ritmo de processamento de categorias em segundo
+    // plano (throttling de CPU real, via protocolo de debug do
+    // Chromium) sem derrubar a conexão — funciona pra qualquer conta,
+    // não só Premium. Desligado por padrão até ser testado a fundo.
+    this.ecoModeEnabled = !!data.ecoModeEnabled;
   }
 
   _emptyState() {
     const category = { id: newId('cat'), name: 'Principal', createdAt: new Date().toISOString() };
-    return { categories: [category], accounts: [], activeCategoryId: category.id };
+    return { categories: [category], accounts: [], activeCategoryId: category.id, ecoModeEnabled: false };
   }
 
   _load() {
@@ -66,7 +71,7 @@ class AccountsStore {
       if (Array.isArray(parsed)) {
         const category = { id: newId('cat'), name: 'Principal', createdAt: new Date().toISOString() };
         const accounts = parsed.map((a) => ({ ...a, categoryId: category.id }));
-        return { categories: [category], accounts, activeCategoryId: category.id };
+        return { categories: [category], accounts, activeCategoryId: category.id, ecoModeEnabled: false };
       }
 
       if (!parsed || !Array.isArray(parsed.categories) || parsed.categories.length === 0) {
@@ -89,7 +94,7 @@ class AccountsStore {
         ? parsed.activeCategoryId
         : categories[0].id;
 
-      return { categories, accounts, activeCategoryId };
+      return { categories, accounts, activeCategoryId, ecoModeEnabled: !!parsed.ecoModeEnabled };
     } catch (err) {
       console.error('[AccountsStore] Falha ao ler o arquivo de contas:', err);
       return this._emptyState();
@@ -103,11 +108,22 @@ class AccountsStore {
         categories: this.categories,
         accounts: this.accounts,
         activeCategoryId: this.activeCategoryId,
+        ecoModeEnabled: this.ecoModeEnabled,
       };
       fs.writeFileSync(this.filePath, JSON.stringify(payload, null, 2), 'utf-8');
     } catch (err) {
       console.error('[AccountsStore] Falha ao salvar o arquivo de contas:', err);
     }
+  }
+
+  getEcoModeEnabled() {
+    return this.ecoModeEnabled;
+  }
+
+  setEcoModeEnabled(enabled) {
+    this.ecoModeEnabled = !!enabled;
+    this._save();
+    return this.ecoModeEnabled;
   }
 
   // ---------------------------------------------------------------------

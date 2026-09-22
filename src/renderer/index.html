@@ -108,24 +108,40 @@
         </div>
 
         <div class="auth-card">
-          <h2 class="license-heading">Licença</h2>
-          <p class="subtitle" id="license-message">Verificando sua licença...</p>
-
-          <button type="button" id="relogin-btn" class="hidden">Entrar novamente</button>
-          <button type="button" id="buy-license-btn">Comprar licença — R$ 20</button>
-          <button type="button" id="buy-device-slot-btn" class="hidden">Comprar slot extra pra este dispositivo</button>
-          <button type="button" id="refresh-license-btn" class="link-btn">Já paguei, verificar de novo</button>
-
-          <div class="redeem-key-box" id="redeem-key-box">
-            <p class="redeem-key-label">Tem uma chave de ativação?</p>
-            <form id="redeem-key-form">
-              <input type="text" id="redeem-key-input" placeholder="Ex: 7K2M-9PXR-4QWT" autocomplete="off" />
-              <button type="submit">Resgatar chave</button>
-            </form>
-            <p class="auth-error" id="redeem-key-error"></p>
+          <!-- Atualização obrigatória — some tudo do resto e mostra só isso -->
+          <div id="force-update-box" class="hidden">
+            <h2 class="license-heading">Atualização obrigatória</h2>
+            <p class="subtitle">
+              Uma nova versão do IdleHive é necessária pra continuar usando.
+              Baixe e instale por cima da versão atual — leva menos de um minuto.
+            </p>
+            <button type="button" id="force-update-download-btn">Baixar atualização</button>
+            <p class="force-update-version" id="force-update-version"></p>
+            <button type="button" id="logout-from-force-update-btn" class="link-btn">Sair da conta</button>
           </div>
 
-          <button type="button" id="logout-from-license-btn" class="link-btn">Sair da conta</button>
+          <div id="license-normal-content">
+            <h2 class="license-heading">Licença</h2>
+            <p class="subtitle" id="license-message">Verificando sua licença...</p>
+
+            <button type="button" id="relogin-btn" class="hidden">Entrar novamente</button>
+            <button type="button" id="buy-license-btn">Comprar licença — R$ 20</button>
+            <button type="button" id="buy-license-pix-btn" class="pix-btn">Pagar com PIX</button>
+            <button type="button" id="buy-device-slot-btn" class="hidden">Comprar slot extra pra este dispositivo</button>
+            <button type="button" id="buy-device-slot-pix-btn" class="pix-btn hidden">Pagar slot extra com PIX</button>
+            <button type="button" id="refresh-license-btn" class="link-btn">Já paguei, verificar de novo</button>
+
+            <div class="redeem-key-box" id="redeem-key-box">
+              <p class="redeem-key-label">Tem uma chave de ativação?</p>
+              <form id="redeem-key-form">
+                <input type="text" id="redeem-key-input" placeholder="Ex: 7K2M-9PXR-4QWT" autocomplete="off" />
+                <button type="submit">Resgatar chave</button>
+              </form>
+              <p class="auth-error" id="redeem-key-error"></p>
+            </div>
+
+            <button type="button" id="logout-from-license-btn" class="link-btn">Sair da conta</button>
+          </div>
         </div>
       </div>
     </section>
@@ -180,6 +196,21 @@
           <span>Mercado RMT</span>
         </button>
 
+        <button type="button" id="eco-mode-toggle" class="eco-bar" title="Reduz o processamento das categorias em segundo plano, sem desconectar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4" />
+            <path d="M12 18v4" />
+            <path d="M4.9 4.9l2.8 2.8" />
+            <path d="M16.3 16.3l2.8 2.8" />
+            <path d="M2 12h4" />
+            <path d="M18 12h4" />
+            <path d="M4.9 19.1l2.8-2.8" />
+            <path d="M16.3 7.7l2.8-2.8" />
+          </svg>
+          <span>Modo Eco</span>
+          <span class="eco-state" id="eco-state">Desligado</span>
+        </button>
+
         <!-- Lista de categorias (cada uma com suas abas, recolhível) -->
         <div id="category-list" class="category-list"></div>
 
@@ -207,8 +238,18 @@
           </div>
 
           <div id="update-banner" class="update-banner hidden">
-            <span>Atualização pronta.</span>
-            <button type="button" id="update-restart-btn">Reiniciar agora</button>
+            <div class="update-banner-head">
+              <svg class="update-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12" />
+                <polyline points="7 10 12 15 17 10" />
+                <path d="M4 19h16" />
+              </svg>
+              <span id="update-text">Nova versão disponível</span>
+            </div>
+            <div id="update-progress-track" class="update-progress-track">
+              <div id="update-progress-fill" class="update-progress-fill" style="width: 0%"></div>
+            </div>
+            <button type="button" id="update-restart-btn" class="hidden">Reiniciar agora</button>
           </div>
         </div>
       </aside>
@@ -226,6 +267,7 @@
           <p class="panel-hint" id="account-plan-status">Verificando plano...</p>
 
           <button type="button" id="account-buy-license-btn" class="hidden">Comprar licença — R$ 20</button>
+          <button type="button" id="account-buy-license-pix-btn" class="pix-btn hidden">Pagar com PIX</button>
 
           <div class="redeem-key-box">
             <p class="redeem-key-label">Tem uma chave de ativação?</p>

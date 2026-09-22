@@ -83,7 +83,9 @@ signupForm.addEventListener('submit', async (event) => {
 
 const licenseMessage = document.getElementById('license-message');
 const buyLicenseBtn = document.getElementById('buy-license-btn');
+const buyLicensePixBtn = document.getElementById('buy-license-pix-btn');
 const buyDeviceSlotBtn = document.getElementById('buy-device-slot-btn');
+const buyDeviceSlotPixBtn = document.getElementById('buy-device-slot-pix-btn');
 const reloginBtn = document.getElementById('relogin-btn');
 const redeemKeyBox = document.getElementById('redeem-key-box');
 const refreshLicenseBtn = document.getElementById('refresh-license-btn');
@@ -97,12 +99,30 @@ buyLicenseBtn.addEventListener('click', async () => {
   }
 });
 
+buyLicensePixBtn.addEventListener('click', async () => {
+  const result = await window.idleHive.buyLicensePix();
+  if (!result.ok) {
+    licenseMessage.textContent = result.error || 'Não foi possível iniciar o pagamento.';
+  } else {
+    licenseMessage.textContent = 'Finalize o PIX na aba do navegador que abriu, depois clique em "verificar de novo".';
+  }
+});
+
 buyDeviceSlotBtn.addEventListener('click', async () => {
   const result = await window.idleHive.buyDeviceSlot();
   if (!result.ok) {
     licenseMessage.textContent = result.error || 'Não foi possível iniciar o pagamento.';
   } else {
     licenseMessage.textContent = 'Finalize a compra na aba do navegador que abriu, depois clique em "verificar de novo".';
+  }
+});
+
+buyDeviceSlotPixBtn.addEventListener('click', async () => {
+  const result = await window.idleHive.buyDeviceSlotPix();
+  if (!result.ok) {
+    licenseMessage.textContent = result.error || 'Não foi possível iniciar o pagamento.';
+  } else {
+    licenseMessage.textContent = 'Finalize o PIX na aba do navegador que abriu, depois clique em "verificar de novo".';
   }
 });
 
@@ -131,6 +151,14 @@ document.getElementById('logout-from-license-btn').addEventListener('click', () 
   window.idleHive.signOut();
 });
 
+document.getElementById('logout-from-force-update-btn').addEventListener('click', () => {
+  window.idleHive.signOut();
+});
+
+document.getElementById('force-update-download-btn').addEventListener('click', () => {
+  window.idleHive.openDownloadPage();
+});
+
 reloginBtn.addEventListener('click', () => {
   window.idleHive.signOut();
 });
@@ -141,6 +169,21 @@ window.idleHive.onSetView(({ view, data }) => {
     showAuthTab('login');
   }
   if (view === 'license') {
+    const forceUpdateBox = document.getElementById('force-update-box');
+    const licenseNormalContent = document.getElementById('license-normal-content');
+
+    if (data && data.forceUpdate) {
+      // Tem prioridade sobre qualquer outra coisa — mesmo com licença
+      // válida, essa versão específica do app não pode continuar.
+      licenseNormalContent.classList.add('hidden');
+      forceUpdateBox.classList.remove('hidden');
+      document.getElementById('force-update-version').textContent =
+        `Versão instalada: ${data.currentVersion} · versão mínima exigida: ${data.minAppVersion}`;
+      return;
+    }
+    forceUpdateBox.classList.add('hidden');
+    licenseNormalContent.classList.remove('hidden');
+
     const isAuthError = !!(data && data.authError);
     const isDeviceLimit = !isAuthError && data && data.reason === 'device_limit';
 
@@ -150,7 +193,9 @@ window.idleHive.onSetView(({ view, data }) => {
       // resolve é só entrar de novo.
       reloginBtn.classList.remove('hidden');
       buyLicenseBtn.classList.add('hidden');
+      buyLicensePixBtn.classList.add('hidden');
       buyDeviceSlotBtn.classList.add('hidden');
+      buyDeviceSlotPixBtn.classList.add('hidden');
       redeemKeyBox.classList.add('hidden');
       refreshLicenseBtn.classList.add('hidden');
       licenseMessage.textContent = 'Sua sessão expirou. Entre de novo pra continuar.';
@@ -165,7 +210,9 @@ window.idleHive.onSetView(({ view, data }) => {
     // licença válida — comprar OUTRA licença não resolve, o que falta
     // é um slot extra pra este dispositivo específico.
     buyLicenseBtn.classList.toggle('hidden', isDeviceLimit);
+    buyLicensePixBtn.classList.toggle('hidden', isDeviceLimit);
     buyDeviceSlotBtn.classList.toggle('hidden', !isDeviceLimit);
+    buyDeviceSlotPixBtn.classList.toggle('hidden', !isDeviceLimit);
 
     licenseMessage.textContent =
       (data && data.error) ||
@@ -178,8 +225,10 @@ window.idleHive.onSetView(({ view, data }) => {
     renderAccountModal();
     // Uma renovação (compra, chave resgatada) sempre passa por um
     // bootstrap novo antes de chegar aqui — se o aviso de expiração
-    // ainda estava na tela, esconde: a reconferência periódica mostra
-    // de novo se a licença nova também estiver perto de vencer.
+    // ainda estava na tela, esconde e para a contagem regressiva: a
+    // reconferência periódica mostra de novo se a licença nova também
+    // estiver perto de vencer.
+    expiryDeadline = null;
     document.getElementById('expiry-banner').classList.add('hidden');
   }
 });
@@ -194,12 +243,16 @@ const accountModal = document.getElementById('account-modal');
 const accountModalClose = document.getElementById('account-modal-close');
 const accountPlanStatus = document.getElementById('account-plan-status');
 const accountBuyLicenseBtn = document.getElementById('account-buy-license-btn');
+const accountBuyLicensePixBtn = document.getElementById('account-buy-license-pix-btn');
 
 let latestLicenseStatus = null;
 
 function formatPlanStatus(status) {
   if (!status) return 'Verificando plano...';
-  if (status.plan === 'standard') return 'Licença ativa (permanente). ✓';
+  if (status.plan === 'standard' && !status.expiresAt) return 'Licença ativa (permanente). ✓';
+  if (status.plan === 'standard' && status.expiresAt) {
+    return `Licença ativa até ${new Date(status.expiresAt).toLocaleString('pt-BR')}.`;
+  }
   if (status.plan === 'promo' && status.expiresAt) {
     return `Licença por chave ativa até ${new Date(status.expiresAt).toLocaleDateString('pt-BR')}.`;
   }
@@ -214,14 +267,35 @@ function formatPlanStatus(status) {
 
 function renderAccountModal() {
   accountPlanStatus.textContent = formatPlanStatus(latestLicenseStatus);
-  const isPaid = latestLicenseStatus && (latestLicenseStatus.plan === 'standard' || latestLicenseStatus.plan === 'promo');
-  accountBuyLicenseBtn.classList.toggle('hidden', !!isPaid);
+  // Só esconde o botão de comprar quando a licença é de verdade
+  // PERMANENTE (plano padrão, sem data de expiração nenhuma). Qualquer
+  // outro caso — trial, chave por prazo perto de vencer, licença padrão
+  // marcada pra expirar (ex: teste manual no banco), ou nenhuma licença
+  // — precisa continuar podendo comprar/renovar. Antes, a checagem
+  // olhava só o TIPO do plano ('standard'/'promo') e escondia o botão
+  // pra qualquer um dos dois, mesmo quando `expiresAt` mostrava que
+  // estava prestes a vencer — travando quem precisava renovar.
+  const isPermanent =
+    latestLicenseStatus && latestLicenseStatus.plan === 'standard' && !latestLicenseStatus.expiresAt;
+  accountBuyLicenseBtn.classList.toggle('hidden', !!isPermanent);
+  accountBuyLicensePixBtn.classList.toggle('hidden', !!isPermanent);
+
+  // Rótulo do botão acompanha a situação: "Renovar" quando já existe
+  // alguma licença (mesmo prestes a vencer) — "Comprar" só quando não
+  // existe nenhuma ainda.
+  const hasAnyLicense = latestLicenseStatus && (latestLicenseStatus.plan === 'standard' || latestLicenseStatus.plan === 'promo');
+  accountBuyLicenseBtn.textContent = hasAnyLicense ? 'Renovar licença — R$ 20' : 'Comprar licença — R$ 20';
+  accountBuyLicensePixBtn.textContent = hasAnyLicense ? 'Renovar com PIX' : 'Pagar com PIX';
 }
 
 accountBtn.addEventListener('click', () => {
   renderAccountModal();
   accountModal.classList.remove('hidden');
   window.idleHive.setModalOpen(true);
+  // Força uma checagem de licença na hora, em vez de confiar só no
+  // ciclo periódico (5min) — importante logo depois de pagar/resgatar
+  // uma chave em outro lugar, pra já refletir aqui sem esperar.
+  window.idleHive.refreshLicense();
 });
 
 accountModalClose.addEventListener('click', () => {
@@ -255,6 +329,13 @@ accountBuyLicenseBtn.addEventListener('click', async () => {
   const result = await window.idleHive.buyLicense();
   accountPlanStatus.textContent = result.ok
     ? 'Finalize a compra na aba do navegador que abriu, depois feche e reabra este menu.'
+    : result.error || 'Não foi possível iniciar o pagamento.';
+});
+
+accountBuyLicensePixBtn.addEventListener('click', async () => {
+  const result = await window.idleHive.buyLicensePix();
+  accountPlanStatus.textContent = result.ok
+    ? 'Finalize o PIX na aba do navegador que abriu, depois feche e reabra este menu.'
     : result.error || 'Não foi possível iniciar o pagamento.';
 });
 
@@ -312,6 +393,14 @@ let renamingCategoryId = null;
 // Categorias recolhidas na sidebar — só estado visual, não persiste.
 const collapsedCategories = new Set();
 
+// Cache de referências DOM por conta (dot/status/cpu/ram) — permite
+// atualizar só os números a cada 2s sem reconstruir a lista inteira.
+// Métricas mudam toda hora; estrutura (quais contas/categorias existem,
+// favorito, foco) muda raramente — só reconstrói de verdade quando a
+// estrutura muda de verdade.
+let accountRowRefs = new Map();
+let lastSidebarSignature = null;
+
 function statusLabel(status) {
   return STATUS_LABEL[status] || status;
 }
@@ -320,19 +409,31 @@ function render(state, force) {
   latestState = state;
   backToGridBtn.disabled = !state.focusedId;
 
-  // As métricas chegam a cada 2s e redesenham a sidebar inteira. Se
-  // houver um campo de renomear aberto (conta OU categoria), redesenhar
-  // destruiria o input no meio da digitação (perdendo o texto e o
-  // cursor) — então o redesenho espera a edição terminar.
+  // As métricas chegam a cada 2s. Se houver um campo de renomear aberto
+  // (conta OU categoria), redesenhar destruiria o input no meio da
+  // digitação (perdendo o texto e o cursor) — então o redesenho espera
+  // a edição terminar.
   if ((renamingId !== null || renamingCategoryId !== null) && !force) {
     return;
   }
 
-  // Se a conta em edição está visível como painel na grade, é lá que o
-  // campo de edição aparece (evita dois <input> disputando foco ao
-  // mesmo tempo — um roubava o foco do outro e fechava a edição sozinho).
-  const renamingHasHeader = renamingId !== null && state.headers.some((h) => h.id === renamingId);
-  renderSidebar(state, renamingHasHeader);
+  // Reconstrói a sidebar inteira só quando algo estrutural mudou (conta
+  // nova, renomeada, movida, favoritada, foco mudou...). Na maioria dos
+  // ticks de 2s, só o CPU/RAM/status mudam — nesses casos, atualiza só
+  // o texto dos itens que já existem, sem recriar nenhum elemento.
+  const signature = computeSidebarSignature(state);
+  if (force || signature !== lastSidebarSignature) {
+    lastSidebarSignature = signature;
+    // Se a conta em edição está visível como painel na grade, é lá que
+    // o campo de edição aparece (evita dois <input> disputando foco ao
+    // mesmo tempo — um roubava o foco do outro e fechava a edição
+    // sozinho).
+    const renamingHasHeader = renamingId !== null && state.headers.some((h) => h.id === renamingId);
+    renderSidebar(state, renamingHasHeader);
+  } else {
+    updateAccountMetrics(state);
+  }
+
   renderHeaders(state);
 }
 
@@ -413,8 +514,10 @@ function buildRenameInput(id, currentName, onDone, onCancel) {
   return input;
 }
 
-// Monta o item de uma aba (usado dentro de cada categoria).
-function buildAccountItem(account, state, renamingHasHeader) {
+// Monta o item de uma aba (usado dentro de cada categoria). Registra as
+// referências dos elementos que mudam a cada 2s (dot/status/cpu/ram) no
+// Map passado, pra permitir atualização barata sem reconstruir o item.
+function buildAccountItem(account, state, renamingHasHeader, refsOut) {
   const isActiveCategory = account.categoryId === state.activeCategoryId;
 
   const item = document.createElement('li');
@@ -464,10 +567,19 @@ function buildAccountItem(account, state, renamingHasHeader) {
 
   const rowBottom = document.createElement('div');
   rowBottom.className = 'row-bottom';
-  rowBottom.innerHTML = `<span>CPU ${account.cpu}%</span><span>RAM ${account.ramMB} MB</span>`;
+  const cpuSpan = document.createElement('span');
+  cpuSpan.textContent = `CPU ${account.cpu}%`;
+  const ramSpan = document.createElement('span');
+  ramSpan.textContent = `RAM ${account.ramMB} MB`;
+  rowBottom.appendChild(cpuSpan);
+  rowBottom.appendChild(ramSpan);
 
   item.appendChild(rowTop);
   item.appendChild(rowBottom);
+
+  if (refsOut) {
+    refsOut.set(account.id, { dot, statusText, cpuSpan, ramSpan });
+  }
 
   item.addEventListener('click', () => {
     if (renamingId === account.id) return;
@@ -488,10 +600,41 @@ function buildAccountItem(account, state, renamingHasHeader) {
   return item;
 }
 
+// Monta uma "assinatura" curta do que estruturalmente importa na sidebar
+// (não inclui CPU/RAM/status, que mudam toda hora e não precisam de
+// reconstrução — só de atualização de texto). Muda só quando categoria
+// ou conta é criada/removida/renomeada/movida, favoritada, ou o foco
+// muda — tudo que realmente exige recriar elementos.
+function computeSidebarSignature(state) {
+  const categories = (state.categories || [])
+    .map((c) => `${c.id}:${c.name}:${collapsedCategories.has(c.id) ? 1 : 0}`)
+    .join(',');
+  const accounts = (state.accounts || [])
+    .map((a) => `${a.id}:${a.name}:${a.categoryId}:${a.favorite ? 1 : 0}`)
+    .join(',');
+  return `${state.activeCategoryId}|${categories}|${accounts}|${state.focusedId}|${renamingId}|${renamingCategoryId}`;
+}
+
+// Caminho barato: só atualiza os números/status dos itens que já existem
+// no DOM, sem criar nem destruir nenhum elemento. É isto que roda a cada
+// 2s na maioria das vezes — o caminho caro (renderSidebar completo) só
+// roda quando a estrutura muda de verdade.
+function updateAccountMetrics(state) {
+  (state.accounts || []).forEach((account) => {
+    const refs = accountRowRefs.get(account.id);
+    if (!refs) return;
+    refs.dot.className = `status-dot ${account.status}`;
+    refs.statusText.textContent = statusLabel(account.status);
+    refs.cpuSpan.textContent = `CPU ${account.cpu}%`;
+    refs.ramSpan.textContent = `RAM ${account.ramMB} MB`;
+  });
+}
+
 // Sidebar em formato de lista/acordeão: cada categoria é uma seção fixa
 // com suas abas embaixo, que podem ser recolhidas clicando no cabeçalho.
 function renderSidebar(state, renamingHasHeader) {
   categoryListEl.innerHTML = '';
+  accountRowRefs = new Map();
 
   const categories = state.categories || [];
   const accounts = state.accounts || [];
@@ -611,7 +754,7 @@ function renderSidebar(state, renamingHasHeader) {
           return 0;
         })
         .forEach((account) => {
-          ul.appendChild(buildAccountItem(account, state, renamingHasHeader));
+          ul.appendChild(buildAccountItem(account, state, renamingHasHeader, accountRowRefs));
         });
       section.appendChild(ul);
     }
@@ -780,28 +923,93 @@ logoutBtn.addEventListener('click', () => {
   window.idleHive.signOut();
 });
 
-document.getElementById('update-restart-btn').addEventListener('click', () => {
+const updateBanner = document.getElementById('update-banner');
+const updateText = document.getElementById('update-text');
+const updateProgressTrack = document.getElementById('update-progress-track');
+const updateProgressFill = document.getElementById('update-progress-fill');
+const updateRestartBtn = document.getElementById('update-restart-btn');
+
+updateRestartBtn.addEventListener('click', () => {
+  // Feedback imediato — instalar+reabrir leva um instante, e sem isso
+  // o clique parece não ter feito nada até a janela sumir de repente.
+  updateRestartBtn.disabled = true;
+  updateRestartBtn.textContent = 'Reiniciando…';
+  updateText.textContent = 'Aplicando a atualização...';
   window.idleHive.restartToUpdate();
 });
 
-window.idleHive.onUpdateReady(() => {
-  document.getElementById('update-banner').classList.remove('hidden');
+// Estado 1: baixando em segundo plano — barra de progresso de verdade,
+// alimentada pelos eventos que o electron-updater dispara a cada pedaço
+// baixado.
+window.idleHive.onUpdateDownloading(() => {
+  updateText.textContent = 'Baixando atualização...';
+  updateProgressTrack.classList.remove('hidden');
+  updateProgressFill.style.width = '0%';
+  updateRestartBtn.classList.add('hidden');
+  updateBanner.classList.remove('hidden');
 });
 
-// Aviso de licença perto de vencer (trial ou chave promo) — o main
-// processo reconfere a cada 5min enquanto o app está na grade, e manda
-// isso quando faltar 30min ou menos. Clicar em "Renovar agora" abre o
-// mesmo modal de conta/licença que o ícone 🔑 já abre.
-function formatMsLeft(ms) {
-  const totalMinutes = Math.max(1, Math.round(ms / 60000));
-  if (totalMinutes < 60) return `${totalMinutes} min`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+window.idleHive.onUpdateProgress(({ percent }) => {
+  updateText.textContent = `Baixando atualização... ${percent}%`;
+  updateProgressFill.style.width = `${percent}%`;
+  updateBanner.classList.remove('hidden');
+});
+
+// Log de diagnóstico do auto-updater — só aparece aqui no Console do
+// DevTools (Ctrl+Shift+I), nunca na interface. Útil pra saber o que
+// está acontecendo de verdade num .exe instalado, que não tem terminal.
+window.idleHive.onUpdateDebug((message) => {
+  console.log(`[auto-updater] ${message}`);
+});
+
+// Estado 2: pronta — some a barra, aparece o botão de reiniciar.
+window.idleHive.onUpdateReady(() => {
+  updateText.textContent = 'Atualização pronta';
+  updateProgressTrack.classList.add('hidden');
+  updateRestartBtn.classList.remove('hidden');
+  updateRestartBtn.disabled = false;
+  updateRestartBtn.textContent = 'Reiniciar agora';
+  updateBanner.classList.remove('hidden');
+});
+
+// Aviso de licença perto de vencer (trial ou chave promo). O main
+// processo reconfere periodicamente e manda o tempo restante quando
+// faltar 30min ou menos — mas em vez de só mostrar aquele número fixo
+// até chegar o próximo aviso, o app conta os segundos sozinho, ao vivo,
+// a partir do horário exato de expiração. Clicar em "Renovar agora"
+// abre o mesmo modal de conta/licença que o ícone 🔑 já abre.
+let expiryDeadline = null; // timestamp absoluto (ms) de quando vence, ou null
+
+function formatCountdown(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function tickExpiryCountdown() {
+  if (expiryDeadline === null) return;
+  const msLeft = expiryDeadline - Date.now();
+  const expiryTextEl = document.getElementById('expiry-text');
+  if (msLeft <= 0) {
+    // Chegou a zero aqui — a checagem do main já está agendada pro
+    // momento exato (com poucos segundos de folga) e vai tirar o
+    // usuário da grade sozinha. Só evita mostrar um contador negativo
+    // enquanto isso não chega.
+    expiryTextEl.textContent = 'Expirando...';
+    expiryDeadline = null;
+    return;
+  }
+  expiryTextEl.textContent = `Sua licença expira em ${formatCountdown(msLeft)}`;
+}
+
+// Roda o tempo todo (custo desprezível — só um textContent por
+// segundo), mas só faz alguma coisa quando expiryDeadline está setado.
+setInterval(tickExpiryCountdown, 1000);
+
 window.idleHive.onLicenseExpiringSoon(({ msLeft }) => {
-  document.getElementById('expiry-text').textContent = `Sua licença expira em ${formatMsLeft(msLeft)}.`;
+  expiryDeadline = Date.now() + msLeft;
+  tickExpiryCountdown();
   document.getElementById('expiry-banner').classList.remove('hidden');
 });
 
@@ -939,6 +1147,31 @@ window.idleHive.onStartRename(startRename);
 // jogos são desenhados por cima de qualquer HTML, ela também precisa
 // desanexá-los (setModalOpen) enquanto está aberta — mesma mecânica dos
 // modais de conta/afiliados.
+
+// ---------------------------------------------------------------------
+// Modo Eco
+// ---------------------------------------------------------------------
+//
+// Reduz o ritmo de processamento (CPU) das categorias em segundo plano
+// sem derrubar a conexão — diferente do Modo Economia (que fecha o
+// navegador de vez, só pra Premium), isso funciona pra qualquer conta.
+
+const ecoModeToggle = document.getElementById('eco-mode-toggle');
+const ecoStateLabel = document.getElementById('eco-state');
+
+function renderEcoModeState(enabled) {
+  ecoModeToggle.classList.toggle('active', !!enabled);
+  ecoStateLabel.textContent = enabled ? 'Ligado' : 'Desligado';
+}
+
+// Estado inicial, assim que o app abre.
+window.idleHive.getEcoMode().then((enabled) => renderEcoModeState(enabled));
+
+ecoModeToggle.addEventListener('click', async () => {
+  const currentlyOn = ecoModeToggle.classList.contains('active');
+  const applied = await window.idleHive.toggleEcoMode(!currentlyOn);
+  renderEcoModeState(applied);
+});
 
 const marketBtn = document.getElementById('market-btn');
 const marketOverlay = document.getElementById('market-overlay');

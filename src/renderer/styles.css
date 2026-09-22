@@ -202,7 +202,8 @@ body {
 .auth-card button[type="submit"],
 .auth-card button#buy-license-btn,
 .auth-card button#buy-device-slot-btn,
-.auth-card button#relogin-btn {
+.auth-card button#relogin-btn,
+.auth-card button#force-update-download-btn {
   margin-top: 4px;
   background: var(--indigo);
   border: none;
@@ -218,7 +219,8 @@ body {
 .auth-card button[type="submit"]:hover,
 .auth-card button#buy-license-btn:hover,
 .auth-card button#buy-device-slot-btn:hover,
-.auth-card button#relogin-btn:hover {
+.auth-card button#relogin-btn:hover,
+.auth-card button#force-update-download-btn:hover {
   background: var(--indigo-dim);
 }
 
@@ -588,14 +590,57 @@ body {
   background: var(--surface-2);
   border: 1px solid var(--indigo);
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: 11px 12px;
   font-size: 11.5px;
   color: var(--text-dim);
   flex-shrink: 0;
+  box-shadow: 0 0 20px -6px rgba(88, 101, 242, 0.4);
 }
 
 .update-banner.hidden {
   display: none;
+}
+
+.update-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.update-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--indigo-bright);
+  animation: update-bounce 1.4s ease-in-out infinite;
+}
+
+@keyframes update-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+#update-text {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.update-progress-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.update-progress-track.hidden {
+  display: none;
+}
+
+.update-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--indigo), var(--indigo-bright));
+  transition: width 0.3s ease;
 }
 
 .update-banner button {
@@ -603,13 +648,23 @@ body {
   border: none;
   color: #fff;
   border-radius: var(--radius-sm);
-  padding: 6px 0;
+  padding: 7px 0;
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.update-banner button:hover {
+.update-banner button.hidden {
+  display: none;
+}
+
+.update-banner button:disabled {
+  background: var(--surface-3);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.update-banner button:hover:not(:disabled) {
   background: var(--indigo-dim);
 }
 
@@ -1916,4 +1971,90 @@ body {
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
+}
+
+
+.force-update-version {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  margin: 10px 0 0 0;
+}
+
+#force-update-box.hidden,
+#license-normal-content.hidden {
+  display: none;
+}
+
+/* ---------- Modo Eco (throttle de categorias em segundo plano) ---------- */
+
+.eco-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.eco-bar:hover {
+  border-color: var(--green);
+}
+
+.eco-bar svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+  transition: color 0.15s ease;
+}
+
+.eco-bar .eco-state {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+}
+
+/* Estado ligado — verde, pra ficar claro que está economizando */
+.eco-bar.active {
+  border-color: var(--green);
+  color: #7bd69a;
+  background: rgba(59, 165, 93, 0.08);
+}
+
+.eco-bar.active svg {
+  color: var(--green);
+}
+
+.eco-bar.active .eco-state {
+  color: var(--green);
+}
+
+/* ---------- Botão de pagamento via PIX ---------- */
+
+.pix-btn {
+  background: transparent !important;
+  border: 1px solid #32bcad !important;
+  color: #32bcad !important;
+  margin-top: 8px;
+}
+
+.pix-btn:hover {
+  background: rgba(50, 188, 173, 0.12) !important;
+}
+
+.pix-btn.hidden {
+  display: none;
 }

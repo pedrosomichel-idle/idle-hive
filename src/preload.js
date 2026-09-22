@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('idleHive', {
   openAccountWindow: () => ipcRenderer.invoke('app:openAccountWindow'),
   setModalOpen: (isOpen) => ipcRenderer.invoke('app:setModalOpen', isOpen),
   restartToUpdate: () => ipcRenderer.invoke('app:restartToUpdate'),
+  openDownloadPage: () => ipcRenderer.invoke('app:openDownloadPage'),
   affiliateMe: () => ipcRenderer.invoke('affiliate:me'),
   affiliateJoin: () => ipcRenderer.invoke('affiliate:join'),
 
@@ -36,6 +37,8 @@ contextBridge.exposeInMainWorld('idleHive', {
   marketReport: (conversationId, reason) => ipcRenderer.invoke('market:report', { conversationId, reason }),
   buyLicense: () => ipcRenderer.invoke('license:checkout'),
   buyDeviceSlot: () => ipcRenderer.invoke('license:checkoutDeviceSlot'),
+  buyLicensePix: () => ipcRenderer.invoke('license:checkoutPix'),
+  buyDeviceSlotPix: () => ipcRenderer.invoke('license:checkoutDeviceSlotPix'),
   redeemKey: (code) => ipcRenderer.invoke('license:redeemKey', code),
 
   // Contas / painéis
@@ -45,6 +48,8 @@ contextBridge.exposeInMainWorld('idleHive', {
   renameCategory: (id, name) => ipcRenderer.invoke('categories:rename', { id, name }),
   removeCategory: (id) => ipcRenderer.invoke('categories:remove', id),
   moveAccountToCategory: (id, categoryId) => ipcRenderer.invoke('accounts:moveToCategory', { id, categoryId }),
+  toggleEcoMode: (enabled) => ipcRenderer.invoke('ecoMode:toggle', enabled),
+  getEcoMode: () => ipcRenderer.invoke('ecoMode:get'),
   removeAccount: (id) => ipcRenderer.invoke('accounts:remove', id),
   reloadAccount: (id) => ipcRenderer.invoke('accounts:reload', id),
   toggleMute: (id) => ipcRenderer.invoke('accounts:toggleMute', id),
@@ -69,6 +74,21 @@ contextBridge.exposeInMainWorld('idleHive', {
     const listener = () => callback();
     ipcRenderer.on('app:updateReady', listener);
     return () => ipcRenderer.removeListener('app:updateReady', listener);
+  },
+  onUpdateDownloading: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('app:updateDownloading', listener);
+    return () => ipcRenderer.removeListener('app:updateDownloading', listener);
+  },
+  onUpdateProgress: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('app:updateProgress', listener);
+    return () => ipcRenderer.removeListener('app:updateProgress', listener);
+  },
+  onUpdateDebug: (callback) => {
+    const listener = (_event, message) => callback(message);
+    ipcRenderer.on('app:updateDebug', listener);
+    return () => ipcRenderer.removeListener('app:updateDebug', listener);
   },
   onLicenseExpiringSoon: (callback) => {
     const listener = (_event, data) => callback(data);

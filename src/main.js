@@ -49,6 +49,7 @@ const MIN_ZOOM = 0.3;
 const METRICS_INTERVAL_MS = 2000;
 const LICENSE_RECHECK_INTERVAL_MS = 5 * 60 * 1000; // reconfere a licença a cada 5min
 const LICENSE_WARNING_THRESHOLD_MS = 30 * 60 * 1000; // avisa se faltar 30min ou menos
+const UPDATE_CHECK_INTERVAL_MS = 20 * 60 * 1000; // checa atualização nova a cada 20min
 
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -198,8 +199,14 @@ function createSessionWindow(isPrimary) {
     focusedId: null,
     currentUiView: 'login',
     resizeDebounce: null,
+    isMinimized: false, // pausa o timer de métricas enquanto minimizada
+    expiryCheckTimeout: null, // checagem agendada pro momento exato da expiração
+    modalOpen: false, // true enquanto um modal (conta/afiliados/mercado) está aberto
   };
   sessions.set(win.id, ctx);
+
+  win.on('minimize', () => { ctx.isMinimized = true; });
+  win.on('restore', () => { ctx.isMinimized = false; });
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
@@ -215,6 +222,7 @@ function createSessionWindow(isPrimary) {
 
   win.on('closed', () => {
     if (ctx.resizeDebounce) clearTimeout(ctx.resizeDebounce);
+    if (ctx.expiryCheckTimeout) clearTimeout(ctx.expiryCheckTimeout);
     ctx.views.clear();
     ctx.attached.clear();
     ctx.runtime.clear();
@@ -247,27 +255,67 @@ function setupAutoUpdater() {
 
   autoUpdater.autoDownload = true;
 
-  autoUpdater.on('update-downloaded', () => {
-    updateReadyFlag = true;
+  const broadcast = (channel, data) => {
     for (const ctx of sessions.values()) {
       if (!ctx.window.isDestroyed()) {
-        ctx.window.webContents.send('app:updateReady');
+        ctx.window.webContents.send(channel, data);
       }
     }
+  };
+
+  // Manda TODO evento do auto-updater pro Console do DevTools (Ctrl+
+  // Shift+I) da janela, não só erro. No .exe instalado não tem terminal
+  // nenhum aberto — sem isso, qualquer problema (rede, versão não
+  // encontrada, checksum) fica invisível, sem jeito nenhum de
+  // diagnosticar o que está acontecendo de verdade.
+  const debugLog = (message) => broadcast('app:updateDebug', message);
+
+  autoUpdater.on('checking-for-update', () => {
+    debugLog('Checando se tem versão nova...');
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    debugLog(`Nenhuma versão nova encontrada (versão atual: ${app.getVersion()}, última no GitHub: ${info && info.version}).`);
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    debugLog(`Versão nova encontrada: ${info && info.version}. Baixando...`);
+    broadcast('app:updateDownloading');
+  });
+
+  // Dispara várias vezes durante o download (a cada pedaço baixado) —
+  // é isso que alimenta a barra de progresso de verdade na sidebar.
+  autoUpdater.on('download-progress', (progress) => {
+    broadcast('app:updateProgress', { percent: Math.round(progress.percent) });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    debugLog(`Download concluído: versão ${info && info.version} pronta pra instalar.`);
+    updateReadyFlag = true;
+    broadcast('app:updateReady');
   });
 
   autoUpdater.on('error', (err) => {
+    debugLog(`ERRO no auto-updater: ${err.message}`);
     console.error('[autoUpdater] erro ao checar/baixar atualização:', err.message);
   });
 
-  const check = () => autoUpdater.checkForUpdates().catch((err) => {
-    console.error('[autoUpdater] falha ao checar atualização:', err.message);
-  });
+  const check = () => {
+    debugLog(`Versão atual do app: ${app.getVersion()}.`);
+    autoUpdater.checkForUpdates().catch((err) => {
+      debugLog(`ERRO ao iniciar a checagem: ${err.message}`);
+      console.error('[autoUpdater] falha ao checar atualização:', err.message);
+    });
+  };
 
   check();
-  // O app costuma ficar aberto por horas (jogos idle) — reconfere de
-  // tempos em tempos, não só na abertura.
-  setInterval(check, 4 * 60 * 60 * 1000);
+  // Jogadores desse tipo de jogo idle costumam deixar o app aberto por
+  // dias sem fechar — checar só a cada 4h (como era antes) significava
+  // demorar até esse tanto pra alguém saber de uma atualização nova. A
+  // checagem em si é leve (só lê um arquivo pequeno do GitHub Releases,
+  // não é uma chamada de API pesada), então dá pra checar bem mais
+  // seguido sem custo real.
+  setInterval(check, UPDATE_CHECK_INTERVAL_MS);
 }
 
 function setUiView(ctx, view, data) {
@@ -344,6 +392,71 @@ function ensureAccountsStoreForUser(ctx, userId) {
 // tudo certo, libera a grade de painéis. Chamada ao abrir a janela e
 // depois de qualquer ação que possa mudar esse estado (login, compra,
 // logout).
+// Cancela a checagem exata agendada pra uma janela (chave/trial
+// renovado, sessão sumiu, licença virou permanente, etc).
+function clearExpiryWatch(ctx) {
+  if (ctx.expiryCheckTimeout) {
+    clearTimeout(ctx.expiryCheckTimeout);
+    ctx.expiryCheckTimeout = null;
+  }
+}
+
+// Avisa o renderer se a licença estiver perto de vencer, e agenda uma
+// checagem EXATA pro momento em que ela vence de verdade. Chamada tanto
+// pelo bootstrap() (login/abertura do app) quanto pelo recheckLicense()
+// (reconferência periódica) — sem isso nos dois lugares, uma licença já
+// cadastrada com prazo curto só seria percebida no próximo ciclo de 5
+// minutos, mesmo abrindo o app do zero.
+function scheduleLicenseWatch(ctx, status) {
+  const expiresAtIso = status && (status.trialEndsAt || status.expiresAt) || null;
+
+  if (!expiresAtIso) {
+    clearExpiryWatch(ctx);
+    return;
+  }
+
+  const msLeft = new Date(expiresAtIso).getTime() - Date.now();
+  if (msLeft <= 0) {
+    clearExpiryWatch(ctx);
+    return;
+  }
+
+  if (msLeft <= LICENSE_WARNING_THRESHOLD_MS) {
+    ctx.window.webContents.send('license:expiringSoon', { msLeft, expiresAt: expiresAtIso });
+  }
+
+  // Só agenda a checagem EXATA quando a expiração já está dentro de uma
+  // janela razoável (a mesma dos 30min de aviso). Sem esse limite, uma
+  // licença que ainda falta dias/semanas pra vencer geraria um
+  // setTimeout maior que o teto de 32 bits do Node (~24,8 dias) — o
+  // Node não erra nesse caso, só TRUNCA silenciosamente pra 1ms e
+  // dispara na hora, que reagenda outro igualmente gigante, que
+  // também vira 1ms... um loop infinito reconferindo a licença sem
+  // parar. A reconferência periódica (a cada 5min) já dá conta de
+  // perceber, com o tempo, quando a expiração finalmente entrar nessa
+  // janela — é só aí que faz sentido ter um timer exato.
+  clearExpiryWatch(ctx);
+  if (msLeft <= LICENSE_WARNING_THRESHOLD_MS) {
+    ctx.expiryCheckTimeout = setTimeout(() => recheckLicense(ctx), msLeft + 5000);
+  }
+}
+
+// Compara duas versões "x.y.z" (sem precisar da lib semver inteira, já
+// que aqui é só isso: 1.0.15 é maior que 1.0.9?). Retorna true quando
+// `current` é menor que `minimum`.
+function isVersionBelow(current, minimum) {
+  if (!minimum) return false;
+  const c = String(current).split('.').map(Number);
+  const m = String(minimum).split('.').map(Number);
+  for (let i = 0; i < Math.max(c.length, m.length); i++) {
+    const cPart = c[i] || 0;
+    const mPart = m[i] || 0;
+    if (cPart < mPart) return true;
+    if (cPart > mPart) return false;
+  }
+  return false;
+}
+
 async function bootstrap(ctx) {
   if (!ctx || !ctx.window || ctx.window.isDestroyed()) return;
 
@@ -351,6 +464,7 @@ async function bootstrap(ctx) {
   if (!storedSession || !storedSession.access_token || !storedSession.user || !storedSession.user.id) {
     ctx.accountsStore = null;
     ctx.userId = null;
+    clearExpiryWatch(ctx);
     setUiView(ctx, 'login');
     return;
   }
@@ -358,13 +472,32 @@ async function bootstrap(ctx) {
   const deviceId = getDeviceId();
   const status = await fetchLicenseStatus(storedSession.access_token, deviceId);
 
+  // Versão mínima obrigatória — checa ANTES de qualquer outra coisa,
+  // mesmo que a licença esteja perfeitamente válida. É o único gatilho
+  // de atualização que não depende do GitHub Releases/auto-updater
+  // funcionar direito, então serve de último recurso.
+  if (status && isVersionBelow(app.getVersion(), status.minAppVersion)) {
+    clearExpiryWatch(ctx);
+    destroyAllViews(ctx);
+    setUiView(ctx, 'license', { ...status, forceUpdate: true, currentVersion: app.getVersion() });
+    return;
+  }
+
   if (!status || !status.valid) {
+    // Licença inválida/vencida — destrói os painéis de jogo ANTES de
+    // trocar de tela. Sem isso, o BrowserView do painel em foco
+    // continuava desenhado por cima da tela de licença, jogável, mesmo
+    // com a licença vencida.
+    clearExpiryWatch(ctx);
+    destroyAllViews(ctx);
     setUiView(ctx, 'license', status);
     return;
   }
 
   const activation = await activateDevice(storedSession.access_token, deviceId, os.hostname());
   if (!activation.ok) {
+    clearExpiryWatch(ctx);
+    destroyAllViews(ctx);
     setUiView(ctx, 'license', {
       ...status,
       error: activation.data && activation.data.error,
@@ -377,6 +510,11 @@ async function bootstrap(ctx) {
 
   setUiView(ctx, 'app', status);
   syncViewsWithAccounts(ctx);
+  // Se essa licença já nasce com prazo curto (login novo, ou o banco
+  // foi editado com o app fechado), mostra o aviso e agenda a checagem
+  // exata JÁ — não espera o primeiro ciclo de 5min da reconferência
+  // periódica pra perceber isso.
+  scheduleLicenseWatch(ctx, status);
 }
 
 // Reconfere a licença de uma janela que já está na grade (view 'app').
@@ -396,22 +534,25 @@ async function recheckLicense(ctx) {
   const deviceId = getDeviceId();
   const status = await fetchLicenseStatus(storedSession.access_token, deviceId);
 
+  // Mesma checagem de versão mínima do bootstrap() — cobre quem já
+  // está com o app aberto na grade quando você forçar uma atualização
+  // nova (não precisa esperar a pessoa reiniciar o app pra ser pega).
+  if (status && isVersionBelow(app.getVersion(), status.minAppVersion)) {
+    clearExpiryWatch(ctx);
+    destroyAllViews(ctx);
+    setUiView(ctx, 'license', { ...status, forceUpdate: true, currentVersion: app.getVersion() });
+    return;
+  }
+
   if (!status || !status.valid) {
     // Expirou de verdade com o app aberto — desloga da grade agora,
     // não deixa continuar usando até o próximo reinício.
+    clearExpiryWatch(ctx);
     await bootstrap(ctx);
     return;
   }
 
-  // Ainda válida — mas se for trial ou licença por prazo (chave promo),
-  // avisa com antecedência quando estiver perto de vencer.
-  const expiresAtIso = status.trialEndsAt || status.expiresAt || null;
-  if (expiresAtIso) {
-    const msLeft = new Date(expiresAtIso).getTime() - Date.now();
-    if (msLeft > 0 && msLeft <= LICENSE_WARNING_THRESHOLD_MS) {
-      ctx.window.webContents.send('license:expiringSoon', { msLeft, expiresAt: expiresAtIso });
-    }
-  }
+  scheduleLicenseWatch(ctx, status);
 }
 
 function registerAuthIpcHandlers() {
@@ -525,6 +666,52 @@ function registerAuthIpcHandlers() {
     }
   });
 
+  ipcMain.handle('license:checkoutPix', async (event) => {
+    const ctx = getCtx(event);
+    const storedSession = ctx ? await getFreshSession(ctx) : null;
+    if (!storedSession) return { ok: false, error: 'Não autenticado' };
+
+    try {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/mercadopago/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${storedSession.access_token}`,
+        },
+        body: JSON.stringify({ type: 'license' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: json.error || 'Falha ao iniciar checkout' };
+      shell.openExternal(json.checkoutUrl);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('license:checkoutDeviceSlotPix', async (event) => {
+    const ctx = getCtx(event);
+    const storedSession = ctx ? await getFreshSession(ctx) : null;
+    if (!storedSession) return { ok: false, error: 'Não autenticado' };
+
+    try {
+      const res = await net.fetch(`${config.BACKEND_URL}/api/mercadopago/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${storedSession.access_token}`,
+        },
+        body: JSON.stringify({ type: 'device_slot', deviceId: getDeviceId() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: json.error || 'Falha ao iniciar checkout' };
+      shell.openExternal(json.checkoutUrl);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('license:redeemKey', async (event, code) => {
     const ctx = getCtx(event);
     const storedSession = ctx ? await getFreshSession(ctx) : null;
@@ -559,7 +746,20 @@ function registerAuthIpcHandlers() {
   });
 
   ipcMain.handle('app:restartToUpdate', () => {
-    autoUpdater.quitAndInstall();
+    // isSilent:true — roda o instalador sem mostrar nenhuma tela (é
+    // isso que faltava; sem esse argumento, o padrão do electron-updater
+    // é FALSE, e por isso a atualização parecia uma instalação do zero.
+    // isForceRunAfter:true — reabre o app sozinho depois, pronto pro
+    // usuário continuar, sem precisar abrir manualmente de novo.
+    autoUpdater.quitAndInstall(true, true);
+    return true;
+  });
+
+  ipcMain.handle('app:openDownloadPage', () => {
+    // Usado pela tela de "atualização obrigatória" — abre o link de
+    // download no navegador padrão, pra quem está travado por causa de
+    // uma versão mínima que o backend está exigindo agora.
+    shell.openExternal(`${config.BACKEND_URL}/download`);
     return true;
   });
 
@@ -737,6 +937,44 @@ function buildErrorPage(description, url) {
   </body></html>`;
 }
 
+// Modo Eco: quanto mais devagar o JavaScript de uma categoria em
+// segundo plano roda (4x mais lento). O WebSocket e a conexão em si
+// continuam normais — só o processamento fica mais devagar, então a
+// conta não desconecta, só reage mais devagar enquanto ninguém olha.
+const ECO_THROTTLE_RATE = 4;
+
+// Liga/desliga o throttle de CPU de um painel via o protocolo de debug
+// do Chromium (o mesmo mecanismo por trás do "slowdown" de CPU nas
+// DevTools). Diferente de destruir o processo (Modo Economia,
+// exclusivo Premium), isso NUNCA desconecta a conta — só reduz o ritmo
+// de processamento, funciona pra qualquer conta.
+async function setEcoThrottle(view, enabled) {
+  if (!view || view.webContents.isDestroyed()) return;
+  const wc = view.webContents;
+  try {
+    if (!wc.debugger.isAttached()) {
+      wc.debugger.attach('1.3');
+    }
+    await wc.debugger.sendCommand('Emulation.setCPUThrottlingRate', {
+      rate: enabled ? ECO_THROTTLE_RATE : 1,
+    });
+  } catch (err) {
+    // Falha aqui não é crítica (ex: debugger já anexado por outra
+    // ferramenta) — o painel só continua na velocidade normal.
+    console.error('[modoEco] falha ao aplicar throttle:', err.message);
+  }
+}
+
+// Aplica (ou remove) o Modo Eco em todas as contas de uma categoria.
+function applyEcoModeToCategory(ctx, categoryId, enabled) {
+  if (!ctx || !ctx.accountsStore) return;
+  const ids = ctx.accountsStore.accountIdsInCategory(categoryId);
+  for (const id of ids) {
+    const view = ctx.views.get(id);
+    if (view) setEcoThrottle(view, enabled);
+  }
+}
+
 function createViewForAccount(ctx, account) {
   const view = new BrowserView({
     webPreferences: {
@@ -744,11 +982,31 @@ function createViewForAccount(ctx, account) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Nenhum jogo precisa de corretor ortográfico — por padrão o
+      // Electron carrega um dicionário inteiro EM CADA processo, gasto
+      // de memória puro numa tela que não tem caixa de texto nenhuma.
+      spellcheck: false,
+      // Deixa o Chromium reduzir o ritmo de timers/JS de painéis fora
+      // de tela (categorias em segundo plano) — confirmado que o
+      // Huntera recalcula o progresso pelo relógio real quando volta a
+      // ficar visível, então isso não atrasa nada pro jogador, só
+      // economiza CPU enquanto ele não está olhando.
+      backgroundThrottling: true,
     },
   });
 
   view.webContents.setAudioMuted(!!account.muted);
   setStatus(ctx, account.id, 'loading');
+
+  // Se essa conta já nasce numa categoria em segundo plano e o Modo Eco
+  // está ligado, já começa throttled — sem esperar uma troca de
+  // categoria pra economizar.
+  if (
+    ctx.accountsStore.getEcoModeEnabled() &&
+    account.categoryId !== ctx.accountsStore.getActiveCategoryId()
+  ) {
+    setEcoThrottle(view, true);
+  }
 
   view.webContents.on('did-start-loading', () => {
     setStatus(ctx, account.id, 'loading');
@@ -808,11 +1066,40 @@ function destroyViewForAccount(ctx, id) {
     ctx.attached.delete(id);
   }
   if (!view.webContents.isDestroyed()) {
+    // Se o Modo Eco tinha anexado o debugger nesse painel, desanexa
+    // antes de destruir — evita erro/vazamento (o Electron não faz
+    // isso sozinho quando o webContents é destruído com o debugger
+    // ainda preso nele).
+    try {
+      if (view.webContents.debugger.isAttached()) {
+        view.webContents.debugger.detach();
+      }
+    } catch (err) {
+      // Não crítico — o webContents está sendo destruído de qualquer forma.
+    }
     view.webContents.destroy();
   }
   ctx.views.delete(id);
   ctx.runtime.delete(id);
   ctx.panelRects.delete(id);
+}
+
+// Destrói TODOS os painéis de jogo de uma janela — usado quando a
+// licença deixa de ser válida. Painéis de jogo (BrowserView) sempre
+// desenham por cima de qualquer HTML no Electron, não importa a "view"
+// que a gente mande mostrar — sem isso, a tela de licença aparecia por
+// baixo, e a conta que estava em foco continuava logada e jogável por
+// cima dela, mesmo com a licença vencida.
+function destroyAllViews(ctx) {
+  for (const id of Array.from(ctx.views.keys())) {
+    destroyViewForAccount(ctx, id);
+  }
+  ctx.focusedId = null;
+  // Não sobra nada pra proteger — reseta pra não deixar esse estado
+  // "preso" em true (o que travaria layoutViews() pra sempre depois que
+  // o usuário voltar a ter licença válida, mesmo sem modal nenhum
+  // aberto de verdade).
+  ctx.modalOpen = false;
 }
 
 // Garante que só os painéis realmente visíveis agora fiquem anexados à
@@ -839,6 +1126,12 @@ function syncAttachment(ctx, desiredIds) {
 
 function layoutViews(ctx) {
   if (!ctx || !ctx.window || !ctx.accountsStore) return;
+  // Um modal (conta/afiliados/mercado) está aberto — ele detachou todos
+  // os painéis de propósito, porque painel de jogo sempre desenha por
+  // cima de qualquer HTML. Se algo chamar layoutViews() nesse meio
+  // tempo (ex: uma reconferência de licença que roda em paralelo), não
+  // pode reanexar nada, senão os painéis voltam a cobrir o modal.
+  if (ctx.modalOpen) return;
   const accounts = ctx.accountsStore.list();
   ctx.panelRects = new Map();
 
@@ -1013,22 +1306,56 @@ function registerAccountsIpcHandlers() {
   ipcMain.handle('categories:add', (event, name) => {
     const ctx = getCtx(event);
     if (!ctx || !ctx.accountsStore) return null;
+    const previousCategoryId = ctx.accountsStore.getActiveCategoryId();
     const category = ctx.accountsStore.addCategory(name);
     // A categoria nova nasce vazia e já vira a ativa — os painéis das
     // outras continuam vivos, só saem da tela.
     ctx.focusedId = null;
     layoutViews(ctx);
+
+    if (ctx.accountsStore.getEcoModeEnabled() && previousCategoryId !== category.id) {
+      applyEcoModeToCategory(ctx, previousCategoryId, true); // quem sai, entra em eco
+      // A categoria nova nasce vazia — nada pra tirar do eco ainda.
+    }
     return category;
   });
 
   ipcMain.handle('categories:switch', (event, id) => {
     const ctx = getCtx(event);
     if (!ctx || !ctx.accountsStore) return null;
+    const previousCategoryId = ctx.accountsStore.getActiveCategoryId();
     const switched = ctx.accountsStore.setActiveCategory(id);
     if (!switched) return null;
     ctx.focusedId = null;
     layoutViews(ctx);
+
+    if (ctx.accountsStore.getEcoModeEnabled() && previousCategoryId !== switched) {
+      applyEcoModeToCategory(ctx, previousCategoryId, true); // quem sai, entra em eco
+      applyEcoModeToCategory(ctx, switched, false); // quem entra, volta à velocidade normal
+    }
     return switched;
+  });
+
+  ipcMain.handle('ecoMode:toggle', (event, enabled) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return null;
+    const applied = ctx.accountsStore.setEcoModeEnabled(enabled);
+    const activeCategoryId = ctx.accountsStore.getActiveCategoryId();
+
+    // Aplica na hora em todas as categorias que não são a ativa — sem
+    // esperar a próxima troca de categoria pra fazer efeito.
+    for (const category of ctx.accountsStore.listCategories()) {
+      if (category.id !== activeCategoryId) {
+        applyEcoModeToCategory(ctx, category.id, applied);
+      }
+    }
+    return applied;
+  });
+
+  ipcMain.handle('ecoMode:get', (event) => {
+    const ctx = getCtx(event);
+    if (!ctx || !ctx.accountsStore) return false;
+    return ctx.accountsStore.getEcoModeEnabled();
   });
 
   ipcMain.handle('categories:rename', (event, { id, name }) => {
@@ -1075,7 +1402,14 @@ function registerAccountsIpcHandlers() {
     const ctx = getCtx(event);
     if (!ctx || !ctx.accountsStore) return null;
     const account = ctx.accountsStore.moveToCategory(id, categoryId);
-    if (account) layoutViews(ctx);
+    if (account) {
+      layoutViews(ctx);
+      if (ctx.accountsStore.getEcoModeEnabled()) {
+        const view = ctx.views.get(id);
+        const isNowActive = categoryId === ctx.accountsStore.getActiveCategoryId();
+        if (view) setEcoThrottle(view, !isNowActive);
+      }
+    }
     return account;
   });
 
@@ -1231,6 +1565,7 @@ function registerAccountsIpcHandlers() {
     const ctx = getCtx(event);
     if (!ctx) return false;
 
+    ctx.modalOpen = !!isOpen;
     if (isOpen) {
       syncAttachment(ctx, new Set());
     } else if (ctx.currentUiView === 'app') {
@@ -1294,7 +1629,7 @@ if (!gotSingleInstanceLock) {
 
     metricsTimer = setInterval(() => {
       const activeCtxs = Array.from(sessions.values()).filter(
-        (ctx) => ctx.currentUiView === 'app' && !ctx.window.isDestroyed()
+        (ctx) => ctx.currentUiView === 'app' && !ctx.window.isDestroyed() && !ctx.isMinimized
       );
       if (activeCtxs.length === 0) return;
 
