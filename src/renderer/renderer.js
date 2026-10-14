@@ -293,7 +293,7 @@ function renderAccountModal() {
   // inteiro apagaria o ícone junto.
   const accountPixLabel = accountBuyLicensePixBtn.querySelector('span');
   if (accountPixLabel) {
-    accountPixLabel.textContent = hasAnyLicense ? 'Renovar com PIX — R$ 9,90' : 'Pagar com PIX — R$ 9,90';
+    accountPixLabel.textContent = hasAnyLicense ? 'Renovar com PIX — R$ 19,90' : 'Pagar com PIX — R$ 19,90';
   }
 }
 
